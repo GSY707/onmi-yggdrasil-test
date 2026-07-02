@@ -1,0 +1,8 @@
+.venv/
+.pytest_cache/
+__pycache__/
+*.pyc
+artifacts/**/*.pt
+artifacts/**/*.pth
+HF token.txt
+artifacts
