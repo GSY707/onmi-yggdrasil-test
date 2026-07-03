@@ -10,6 +10,7 @@
 | 路径 | 用途 |
 | --- | --- |
 | `README.md` | 运行方式、验证边界与记忆树口径 |
+| `docs/from-scratch-training-vram-quantization.md` | 从 0 训练完整架构验证的显存、量化、省显存边界和最低价整机购卡建议 |
 | `pyproject.toml` | Python 测试配置、pytest 可选依赖、DocVQA 数据读取可选依赖与预训练/LLaVA 实验依赖 |
 | `.gitignore` | 忽略本地虚拟环境、pytest 缓存、大模型 checkpoint 和本地 HF token 文件 |
 | `experiments/text_to_latent_thought.py` | 纯文本思考训练到特殊 latent token 内部思考的本地 GPU 验证脚本 |
@@ -38,6 +39,14 @@
 | `experiments/omni_transformer_stage_s_scorer_reconstruction.py` | Stage S scorer 与信息还原诊断实验：answer cross-attention scorer、no-pump 专家 token 直连、各层 reconstruction probe |
 | `experiments/omni_transformer_stage_t_preserve_latent.py` | Stage T 保信息 latent 压缩器实验：raw expert token、route-weighted token、summary token、32-slot resampler 对照与 reconstruction probe |
 | `experiments/omni_transformer_stage_u_object_slots.py` | Stage U 扩展视觉输入、对象/空间/计数专家与输出 token sweep 实验：64 patch tokens、object slots、spatial/counting experts、no-patch/no-object 消融 |
+| `experiments/omni_transformer_stage_v_expert_alignment.py` | Stage V 专家语义空间对齐与信息丢失诊断实验：共享 semantic decoder 监督、单 expert 信息还原、跨 expert transfer 语言一致性测试 |
+| `experiments/omni_transformer_stage_w_alignment_mechanisms.py` | Stage W 四种专家对齐机制实验：共享 semantic decoder、slot targets、contrastive alignment、训练期 common semantic bus，推理期直出 latent |
+| `experiments/omni_transformer_stage_x_decomposed_diagnostics.py` | Stage X 分解诊断实验：冻结 expert tokens 后分别测试信息存在、对象化、跨 expert 互读、参数/Transformer 读头和最终 scorer 瓶颈 |
+| `experiments/omni_transformer_stage_y_parallel_input_experts.py` | Stage Y 并行直读输入专家架构修正实验：对比旧串联、并行直读图像专家、合并视觉输入专家，并把 latent 推理从输入专家中拆出 |
+| `experiments/omni_transformer_stage_z_supervised_teacher_diagnostics.py` | Stage Z 显式监督与训练期教师实验：object/spatial/count 专家监督、teacher distillation、信息丢失和潜变量互读诊断 |
+| `experiments/omni_transformer_stage_aa_token_alignment_diagnostics.py` | Stage AA token 级对齐实验：teacher/cross-expert same-position contrastive、信息丢失和潜变量互读诊断 |
+| `experiments/omni_transformer_stage_ab_text_moe_alignment.py` | Stage AB 文本 latent 对齐、latent-to-answer 输出专家和 MoE 推理实验：对齐 prompt/answer latent、候选答案 latent scorer 与 routed reasoner |
+| `experiments/omni_transformer_stage_ac_latent_reasoning.py` | Stage AC/AD/AE/AF/AG Q/A 潜空间、外部信息互译与答案 token 潜空间推理实验：分阶段训练 text codec、evidence codec、latent reasoner，并支持 reasoner-only readout/trace、active-read agent、MoE staged、teacher-forced multi-step query trace 变体与 no/shuffled evidence 门禁 |
 | `src/latent_space_agent_feasibility/` | 纯 Python 原型，实现 LOD、注意力泵、主动采样、记忆树节点/关联边、KV 分支剪枝、离线对齐与渐进式生成计划 |
 | `tests/` | 可运行验证用例，覆盖白皮书核心命题的接口和不变量 |
 | `artifacts/text_to_latent_thought/results.json` | 训练实验结果；运行脚本后生成，不保存模型 checkpoint |
@@ -113,7 +122,59 @@
 | `artifacts/omni_transformer_stage_u_object_slots/sweep_results.json` | Stage U 扩展视觉输入、对象专家与输出 token sweep 多 seed 聚合结果，含 patch-wide、object experts、no-image、no-patch、no-object 消融、参数量和预测成本 |
 | `artifacts/omni_transformer_stage_u_object_slots/sweep_runs/` | Stage U 每次 run 明细 JSON |
 | `artifacts/omni_transformer_stage_u_object_slots/sweep_runs/*/*/samples/` | Stage U 多物体合成视觉问答样例 PNG 与 samples.json |
-| `docs/feasibility-report.md` | 中文可行性结论、关联项目概念映射和未证明边界 |
+| `artifacts/omni_transformer_stage_v_expert_alignment/sweep_results.json` | Stage V 专家语义空间对齐与信息丢失诊断多 seed 聚合结果，含 ranking-only/supervised、信息还原率、信息丢失率、cross-expert transfer 和 language gap |
+| `artifacts/omni_transformer_stage_v_expert_alignment/sweep_runs/` | Stage V 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_v_expert_alignment/sweep_runs/*/samples/` | Stage V 多物体语义监督样例 PNG 与 samples.json |
+| `artifacts/omni_transformer_stage_w_alignment_mechanisms/sweep_results.json` | Stage W 四种专家对齐机制多 seed 聚合结果，含 ranking-only、shared decoder、slot targets、contrastive、训练期 common bus、消融和跨 expert 诊断 |
+| `artifacts/omni_transformer_stage_w_alignment_mechanisms/sweep_runs/` | Stage W 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_w_alignment_mechanisms/sweep_runs/*/samples/` | Stage W 多物体语义监督样例 PNG 与 samples.json |
+| `artifacts/omni_transformer_stage_x_decomposed_diagnostics/sweep_results.json` | Stage X 分解诊断多 seed 聚合结果，含 semantic transfer、answer reconstruction、object table、frozen scorer 与读头参数对比 |
+| `artifacts/omni_transformer_stage_x_decomposed_diagnostics/sweep_runs/` | Stage X 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_x_decomposed_diagnostics/sweep_runs/*/samples/` | Stage X 多物体语义监督样例 PNG 与 samples.json |
+| `artifacts/omni_transformer_stage_y_parallel_input_experts/sweep_results.json` | Stage Y 并行直读输入专家多 seed 聚合结果，含 serial/parallel/merged 对照、消融、参数量、预测成本和 answer reconstruction |
+| `artifacts/omni_transformer_stage_y_parallel_input_experts/sweep_runs/` | Stage Y 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_y_parallel_input_experts/sweep_runs/*/samples/` | Stage Y 多物体视觉问答样例 PNG 与 samples.json |
+| `artifacts/omni_transformer_stage_z_supervised_teacher_diagnostics/sweep_results.json` | Stage Z 显式监督与训练期教师多 seed 聚合结果，含专家消融、训练头指标、信息丢失、semantic/count transfer 和成本 |
+| `artifacts/omni_transformer_stage_z_supervised_teacher_diagnostics/sweep_runs/` | Stage Z 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_z_supervised_teacher_diagnostics/sweep_runs/*/samples/` | Stage Z 多物体视觉问答样例 PNG 与 samples.json |
+| `artifacts/omni_transformer_stage_aa_token_alignment_diagnostics/sweep_results.json` | Stage AA token 级对齐多 seed 聚合结果，含 token 检索、信息丢失、semantic/count transfer、消融和成本 |
+| `artifacts/omni_transformer_stage_aa_token_alignment_diagnostics/sweep_runs/` | Stage AA 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_aa_token_alignment_diagnostics/sweep_runs/*/samples/` | Stage AA 多物体视觉问答样例 PNG 与 samples.json |
+| `artifacts/omni_transformer_stage_ab_text_moe_alignment/sweep_results.json` | Stage AB 文本 latent 对齐与 MoE 推理多 seed 聚合结果，含 latent-to-answer、prompt-answer retrieval、MoE gate、消融和成本 |
+| `artifacts/omni_transformer_stage_ab_text_moe_alignment/sweep_runs/` | Stage AB 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_ab_text_moe_alignment/sweep_runs/*/samples/` | Stage AB 多物体视觉问答样例 PNG 与 samples.json |
+| `artifacts/omni_transformer_stage_ac_latent_reasoning/sweep_results.json` | Stage AC Q/A 潜空间、外部信息互译与答案 token 潜空间推理单 seed 聚合结果，含 text/evidence codec 保真、latent reasoner、no-evidence 与 shuffled-evidence 消融 |
+| `artifacts/omni_transformer_stage_ac_latent_reasoning/sweep_runs/` | Stage AC 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_ad_reasoner_trace/color_readout_reader_results.json` | Stage AD color-only reasoner-only readout/trace 聚合结果，含冻结 codec、reader 还原、no/shuffled evidence 消融 |
+| `artifacts/omni_transformer_stage_ad_reasoner_trace/color_readout_reader_runs/` | Stage AD color-only 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_ad_reasoner_trace/all_readout_reader_results.json` | Stage AD 四任务 reasoner-only readout/trace 聚合结果，含按任务族 answer exact、trace 与 reader 指标 |
+| `artifacts/omni_transformer_stage_ad_reasoner_trace/all_readout_reader_runs/` | Stage AD 四任务每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_ae_active_read/cell_lookup_results.json` | Stage AE cell lookup 主动读取聚合结果，含 cell query、reader 和 no/shuffled evidence 消融 |
+| `artifacts/omni_transformer_stage_ae_active_read/cell_lookup_runs/` | Stage AE cell lookup 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_ae_active_read/count_only_results.json` | Stage AE count-only 主动读取聚合结果，含 count-pair query、count trace 与证据依赖消融 |
+| `artifacts/omni_transformer_stage_ae_active_read/count_only_runs/` | Stage AE count-only 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_ae_active_read/relation_only_results.json` | Stage AE relation-only 主动读取聚合结果，含 left/right object query、relation-op query 与 pair reader 指标 |
+| `artifacts/omni_transformer_stage_ae_active_read/relation_only_runs/` | Stage AE relation-only 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_ae_active_read/all_active_results.json` | Stage AE 四任务 active-read agent 聚合结果，含 query policy、reader、no/shuffled evidence 和按任务族指标 |
+| `artifacts/omni_transformer_stage_ae_active_read/all_active_runs/` | Stage AE 四任务 active-read 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_ae_active_read/all_active_trace2_results.json` | Stage AE 高 trace 权重诊断聚合结果，用于验证单纯加大 trace loss 不能修复 query policy |
+| `artifacts/omni_transformer_stage_ae_active_read/all_active_trace2_runs/` | Stage AE 高 trace 权重诊断每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_af_moe_staged/all_staged_results.json` | Stage AF 四任务 MoE staged 聚合结果，含 gate 塌缩、遗忘和按任务族准确率 |
+| `artifacts/omni_transformer_stage_af_moe_staged/all_staged_runs/` | Stage AF 四任务 MoE staged 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_af_moe_staged/all_mixed_results.json` | Stage AF 四任务 MoE mixed 聚合结果，含 supervised gate、reader 和 no/shuffled evidence 消融 |
+| `artifacts/omni_transformer_stage_af_moe_staged/all_mixed_runs/` | Stage AF 四任务 MoE mixed 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_af_moe_staged/all_staged_replay4_results.json` | Stage AF 四任务 MoE staged+replay 聚合结果，用于验证 replay 对遗忘的缓解效果 |
+| `artifacts/omni_transformer_stage_af_moe_staged/all_staged_replay4_runs/` | Stage AF 四任务 MoE staged+replay 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_af_moe_staged/relation_only_moe_results.json` | Stage AF relation-only MoE 聚合结果，定位 relation query policy 仍未闭合 |
+| `artifacts/omni_transformer_stage_af_moe_staged/relation_only_moe_runs/` | Stage AF relation-only MoE 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_ag_teacher_forced_trace/smoke_results.json` | Stage AG trace_multistep smoke 聚合结果，用于验证 teacher-forced query trace 分支可执行 |
+| `artifacts/omni_transformer_stage_ag_teacher_forced_trace/smoke_runs/` | Stage AG smoke 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_ag_teacher_forced_trace/relation_only_results.json` | Stage AG relation-only teacher-forced multi-step query trace 聚合结果，显示 relation compare/answer 写入仍未闭合 |
+| `artifacts/omni_transformer_stage_ag_teacher_forced_trace/relation_only_runs/` | Stage AG relation-only 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_ag_teacher_forced_trace/all_trace_results.json` | Stage AG 四任务 teacher-forced multi-step query trace 聚合结果，含 full/no/shuffled 与 teacher-forced query 上限 |
+| `artifacts/omni_transformer_stage_ag_teacher_forced_trace/all_trace_runs/` | Stage AG 四任务每次 run 明细 JSON |
+| `docs/feasibility-report.md` | 中文可行性结论、关联项目概念映射、截至 Stage AG 的全部实验结论和未证明边界 |
+| `docs/from-scratch-training-vram-quantization.md` | 从 0 训练完整架构验证的显存档位、量化收益、无效量化、购卡优先级和正式验证下限 |
 | `docs/text-to-latent-thought-experiment.md` | 纯文本思考训练迁移到特殊 latent token 内部思考的本机 GPU 实验报告 |
 | `docs/heterogeneous-latent-input-experiment.md` | 文本动作 + 非文本地形 tensor 的异构输入潜变量实验报告，说明可行性证据与非优劣对照边界 |
 | `docs/heterogeneous-baseline-comparison-experiment.md` | 异构输入同等信息 baseline 对比报告，说明结构化 baseline 同准确率且成本更低 |
@@ -136,6 +197,18 @@
 | `docs/omni-transformer-stage-s-scorer-reconstruction-experiment.md` | Stage S scorer 与信息还原诊断报告，说明 Attention Pump/latent 信息丢失证据和 no-pump 恢复效果 |
 | `docs/omni-transformer-stage-t-preserve-latent-experiment.md` | Stage T 保信息 latent 压缩器报告，说明 raw/weighted token 保真、summary token、32-slot 反例和 token 成本口径 |
 | `docs/omni-transformer-stage-u-object-slots-experiment.md` | Stage U 扩展视觉输入、对象专家与输出 token sweep 报告，说明 higher-entropy 多物体任务、专家消融负结果和下一步强专家方向 |
+| `docs/omni-transformer-stage-v-expert-alignment-experiment.md` | Stage V 专家语义空间对齐与信息丢失诊断报告，说明带监督训练收益、专家语言不通证据、信息丢失率和 common semantic bus 下一步 |
+| `docs/omni-transformer-stage-w-alignment-mechanisms-experiment.md` | Stage W 四种专家对齐机制报告，说明 shared decoder 正信号、slot/contrastive/bus 边界和训练期 common bus 口径 |
+| `docs/omni-transformer-stage-x-decomposed-diagnostics-experiment.md` | Stage X 分解诊断报告，说明 Stage T/W 指标差异、objectization 缺失、Transformer 读头边界和 scorer 瓶颈 |
+| `docs/omni-transformer-stage-y-parallel-input-experts-experiment.md` | Stage Y 并行直读输入专家架构修正报告，说明串联输入专家错误、parallel direct 正信号和功能专家仍未分工 |
+| `docs/omni-transformer-stage-z-supervised-teacher-diagnostics-experiment.md` | Stage Z 显式监督、训练期教师和潜变量互读诊断报告，说明功能专家开始承载任务、teacher 强但互读未解决 |
+| `docs/omni-transformer-stage-aa-token-alignment-diagnostics-experiment.md` | Stage AA token 级对齐报告，说明 token 对齐降低信息丢失、部分改善互读但最终 scorer 未充分使用专家 |
+| `docs/omni-transformer-stage-ab-text-moe-alignment-experiment.md` | Stage AB 文本 latent 对齐、latent-to-answer 专家和 MoE 推理报告，说明文本对齐正信号、输出专家弱信号和朴素 MoE 负结果 |
+| `docs/omni-transformer-stage-ac-latent-reasoning-experiment.md` | Stage AC Q/A 潜空间、外部信息互译与答案 token 潜空间推理报告，说明前两步高保真成功但普通 latent reasoner 未闭合 |
+| `docs/omni-transformer-stage-ad-latent-reasoner-readout-experiment.md` | Stage AD 只调潜变量推理专家 readout/trace 报告，说明 reasoner-only 正信号、count/relation 边界和 selector 对齐担忧 |
+| `docs/omni-transformer-stage-ae-active-read-agent-experiment.md` | Stage AE 潜变量推理专家主动读取 agent 报告，说明 active read 正信号、证据依赖增强和 query policy 失败点 |
+| `docs/omni-transformer-stage-af-moe-staged-reasoner-experiment.md` | Stage AF MoE 推理专家与分任务阶段训练报告，说明 gate 可训、staged 遗忘、replay 缓解和 relation query 仍失败 |
+| `docs/omni-transformer-stage-ag-teacher-forced-query-trace-experiment.md` | Stage AG teacher-forced multi-step query trace 报告，说明正确读取后的上限、自由 query 瓶颈和 relation compare 负结果 |
 | `docs/DIRECTORY_REFERENCE.md` | 当前文件，保持测试工作区结构可检索 |
 
 ## 目录树
@@ -167,6 +240,14 @@
 |   |-- omni_transformer_stage_s_scorer_reconstruction.py
 |   |-- omni_transformer_stage_t_preserve_latent.py
 |   |-- omni_transformer_stage_u_object_slots.py
+|   |-- omni_transformer_stage_v_expert_alignment.py
+|   |-- omni_transformer_stage_w_alignment_mechanisms.py
+|   |-- omni_transformer_stage_x_decomposed_diagnostics.py
+|   |-- omni_transformer_stage_y_parallel_input_experts.py
+|   |-- omni_transformer_stage_z_supervised_teacher_diagnostics.py
+|   |-- omni_transformer_stage_aa_token_alignment_diagnostics.py
+|   |-- omni_transformer_stage_ab_text_moe_alignment.py
+|   |-- omni_transformer_stage_ac_latent_reasoning.py
 |   |-- text_to_latent_sweep.py
 |   |-- text_to_latent_thought.py
 |   |-- visual_multimodal_stage_ab.py
@@ -175,6 +256,7 @@
 |-- docs/
 |   |-- DIRECTORY_REFERENCE.md
 |   |-- feasibility-report.md
+|   |-- from-scratch-training-vram-quantization.md
 |   |-- heterogeneous-baseline-comparison-experiment.md
 |   |-- heterogeneous-latent-input-experiment.md
 |   |-- multimodal-latent-comparison-experiment.md
@@ -195,6 +277,18 @@
 |   |-- omni-transformer-stage-s-scorer-reconstruction-experiment.md
 |   |-- omni-transformer-stage-t-preserve-latent-experiment.md
 |   |-- omni-transformer-stage-u-object-slots-experiment.md
+|   |-- omni-transformer-stage-v-expert-alignment-experiment.md
+|   |-- omni-transformer-stage-w-alignment-mechanisms-experiment.md
+|   |-- omni-transformer-stage-x-decomposed-diagnostics-experiment.md
+|   |-- omni-transformer-stage-y-parallel-input-experts-experiment.md
+|   |-- omni-transformer-stage-z-supervised-teacher-diagnostics-experiment.md
+|   |-- omni-transformer-stage-aa-token-alignment-diagnostics-experiment.md
+|   |-- omni-transformer-stage-ab-text-moe-alignment-experiment.md
+|   |-- omni-transformer-stage-ac-latent-reasoning-experiment.md
+|   |-- omni-transformer-stage-ad-latent-reasoner-readout-experiment.md
+|   |-- omni-transformer-stage-ae-active-read-agent-experiment.md
+|   |-- omni-transformer-stage-af-moe-staged-reasoner-experiment.md
+|   |-- omni-transformer-stage-ag-teacher-forced-query-trace-experiment.md
 |   |-- text-to-latent-thought-experiment.md
 |   |-- visual-multimodal-stage-ab-experiment.md
 |   |-- visual-multimodal-stage-c-experiment.md
@@ -212,6 +306,7 @@
 | 想找什么 | 看哪里 |
 | --- | --- |
 | 多模态潜空间架构是否可行 | `docs/feasibility-report.md` |
+| 从 0 训练完整架构验证至少需要多少显存、量化能省多少、最低价整机买什么显卡 | `docs/from-scratch-training-vram-quantization.md` |
 | 纯文本训练迁移到特殊 latent token 内部思考是否可行 | `experiments/text_to_latent_thought.py` 与 `artifacts/text_to_latent_thought/results.json` |
 | 多 seed / 更长 move 的稳定性 | `experiments/text_to_latent_sweep.py` 与 `artifacts/text_to_latent_thought/sweep_results.json` |
 | 更接近多模态架构的连续潜变量管线 | `experiments/multimodal_latent_pipeline.py` 与 `artifacts/multimodal_latent_pipeline/` |
@@ -261,6 +356,30 @@
 | Stage T raw/weighted token 保真、32-slot 反例和 token 成本口径 | `docs/omni-transformer-stage-t-preserve-latent-experiment.md` |
 | Stage U 扩展视觉输入、对象专家与输出 token sweep 实验 | `experiments/omni_transformer_stage_u_object_slots.py` 与 `artifacts/omni_transformer_stage_u_object_slots/` |
 | Stage U higher-entropy 多物体任务、no-patch/no-object 消融和强专家边界 | `docs/omni-transformer-stage-u-object-slots-experiment.md` |
+| Stage V 专家语义空间对齐与信息丢失诊断实验 | `experiments/omni_transformer_stage_v_expert_alignment.py` 与 `artifacts/omni_transformer_stage_v_expert_alignment/` |
+| Stage V 带监督训练、专家语言不通、信息丢失率与 common semantic bus 下一步 | `docs/omni-transformer-stage-v-expert-alignment-experiment.md` |
+| Stage W 四种专家对齐机制实验 | `experiments/omni_transformer_stage_w_alignment_mechanisms.py` 与 `artifacts/omni_transformer_stage_w_alignment_mechanisms/` |
+| Stage W shared decoder、slot targets、contrastive 与训练期 common bus 结论 | `docs/omni-transformer-stage-w-alignment-mechanisms-experiment.md` |
+| Stage X 信息存在、对象化、跨专家互读与最终读头分解诊断实验 | `experiments/omni_transformer_stage_x_decomposed_diagnostics.py` 与 `artifacts/omni_transformer_stage_x_decomposed_diagnostics/` |
+| Stage X objectization 缺失、Transformer 读头边界和 scorer 瓶颈结论 | `docs/omni-transformer-stage-x-decomposed-diagnostics-experiment.md` |
+| Stage Y 并行直读输入专家架构修正实验 | `experiments/omni_transformer_stage_y_parallel_input_experts.py` 与 `artifacts/omni_transformer_stage_y_parallel_input_experts/` |
+| Stage Y 输入专家直读图像、latent 推理拆分和功能专家分工边界 | `docs/omni-transformer-stage-y-parallel-input-experts-experiment.md` |
+| Stage Z 显式监督、训练期教师与互读诊断实验 | `experiments/omni_transformer_stage_z_supervised_teacher_diagnostics.py` 与 `artifacts/omni_transformer_stage_z_supervised_teacher_diagnostics/` |
+| Stage Z 信息丢失、功能专家承载和潜变量互读结论 | `docs/omni-transformer-stage-z-supervised-teacher-diagnostics-experiment.md` |
+| Stage AA token 级对齐与互读诊断实验 | `experiments/omni_transformer_stage_aa_token_alignment_diagnostics.py` 与 `artifacts/omni_transformer_stage_aa_token_alignment_diagnostics/` |
+| Stage AA token 对齐降低信息丢失但 scorer 未充分使用专家的结论 | `docs/omni-transformer-stage-aa-token-alignment-diagnostics-experiment.md` |
+| Stage AB 文本 latent 对齐、latent-to-answer 专家和 MoE 推理实验 | `experiments/omni_transformer_stage_ab_text_moe_alignment.py` 与 `artifacts/omni_transformer_stage_ab_text_moe_alignment/` |
+| Stage AB 文本对齐正信号、输出专家弱信号和朴素 MoE 负结果 | `docs/omni-transformer-stage-ab-text-moe-alignment-experiment.md` |
+| Stage AC Q/A 潜空间、外部信息互译与答案 token 潜空间推理实验 | `experiments/omni_transformer_stage_ac_latent_reasoning.py` 与 `artifacts/omni_transformer_stage_ac_latent_reasoning/` |
+| Stage AC 前两步高保真成功、普通 latent reasoner 未闭合的结论 | `docs/omni-transformer-stage-ac-latent-reasoning-experiment.md` |
+| Stage AD 只调潜变量推理专家 readout/trace 实验 | `experiments/omni_transformer_stage_ac_latent_reasoning.py` 与 `artifacts/omni_transformer_stage_ad_reasoner_trace/` |
+| Stage AD reasoner-only 正信号、count/relation 边界和 selector 对齐担忧 | `docs/omni-transformer-stage-ad-latent-reasoner-readout-experiment.md` |
+| Stage AE 潜变量推理专家主动读取 agent 实验 | `experiments/omni_transformer_stage_ac_latent_reasoning.py` 与 `artifacts/omni_transformer_stage_ae_active_read/` |
+| Stage AE active read 正信号、证据依赖增强和 query policy 失败点 | `docs/omni-transformer-stage-ae-active-read-agent-experiment.md` |
+| Stage AF MoE 推理专家与分任务阶段训练实验 | `experiments/omni_transformer_stage_ac_latent_reasoning.py` 与 `artifacts/omni_transformer_stage_af_moe_staged/` |
+| Stage AF gate 可训、staged 遗忘、replay 缓解和 relation query 仍失败 | `docs/omni-transformer-stage-af-moe-staged-reasoner-experiment.md` |
+| Stage AG teacher-forced multi-step query trace 实验 | `experiments/omni_transformer_stage_ac_latent_reasoning.py` 与 `artifacts/omni_transformer_stage_ag_teacher_forced_trace/` |
+| Stage AG 正确读取后的上限、自由 query 瓶颈和 relation compare 负结果 | `docs/omni-transformer-stage-ag-teacher-forced-query-trace-experiment.md` |
 | 本轮 GPU 训练实验结论 | `docs/text-to-latent-thought-experiment.md` |
 | 如何运行验证 | `README.md` |
 | LOD 统一维度与正交层级编码 | `src/latent_space_agent_feasibility/core.py` 的 `mean_pool_lod`、`lod_embedding` |

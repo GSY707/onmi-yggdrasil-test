@@ -18,7 +18,7 @@
 
 ## 结论
 
-整体结论：白皮书里的工程方向有可落地的接口骨架，最适合作为 `世界树计划` 现有工作树、记忆树、Fork runtime 的下一层实验分支；但其中“潜空间自我对齐”“真实多模态推理主导权转移”“provider KV Cache 物理剪枝”还没有被本轮验证证明，需要真实模型、服务端 KV API 或训练实验。
+整体结论：白皮书里的工程方向有可落地的接口骨架，最适合作为 `世界树计划` 现有工作树、记忆树、Fork runtime 的下一层实验分支；但其中“潜空间自我对齐”“真实多模态推理主导权转移”“provider KV Cache 物理剪枝”还没有被本轮验证证明，需要真实模型、服务端 KV API 或训练实验。Stage Y 到 AG 的新结论进一步收窄了路线：输入专家应并行直读外部信息，显式监督和 token/text 对齐都有正信号；Q/A 与外部信息互译可以做到高保真，但普通 latent reasoner 不能自动完成答案 token 潜空间推理。只调 latent reasoner、加入显式 readout/trace 后有强正信号；主动读取 agent 后证据依赖性更强，但 query policy 尤其是 relation 的左右对象查询还没有闭合。MoE gate 可以学会任务族路由，但 naive 分阶段训练会灾难性遗忘，replay 只能部分缓解。Teacher-forced multi-step query trace 在四任务上打开了正确读取后的上限，但 relation-only 仍暴露 compare/answer 写入缺少足够硬的中间监督。
 
 | 命题 | 本轮结果 | 证据 |
 | --- | --- | --- |
@@ -53,6 +53,18 @@
 | Stage S Scorer 与信息还原诊断 | 只改最终 scorer 不能修复；移除 Attention Pump 后 L2/L5 大幅恢复；probe 证实信息主要在 pump/thought latent 丢失 | 3 次 sweep：cross+pump L1/L2/L5 为 16.47%/9.96%/12.96%；cross+no-pump L1/L2/L5 为 100%/94.40%/77.67%；L2 no-pump expert concat 可还原 93.16%，pump latent 仅 2.73%；L5 no-pump expert concat 83.14%，pump latent 12.37% |
 | Stage T 保信息 Latent 压缩器 | 保留 raw + route-weighted expert tokens 并追加 summary tokens 后，L2/L3/L5 明显恢复；纯 32-slot resampler 仍失败 | 3 次 sweep：wide residual L1/L2/L3/L5 为 100%/98.63%/73.76%/92.06%，no-image 回到 11.59%/12.17%/12.76%/12.17%；32-slot resampler L1/L2/L3/L5 为 16.15%/13.35%/12.70%/12.04%；L4 counting 仍 19.40% |
 | Stage U 扩展视觉输入、对象专家与输出 token sweep | 64 patch raw evidence tokens 有弱视觉信号；learned object/spatial/counting experts 没有稳定、因果地超过 patch-wide；输出 token 数不是主瓶颈 | 2 seeds x 3 output counts：patch-wide 16.80%/19.04%/18.85%；object expert 20.80%/15.33%/17.68%；no-patch expert 14.06%-15.72%，no-object experts 不降；随机 12.50% |
+| Stage V 专家语义空间对齐与信息丢失诊断 | 带监督语义 loss 提升下游和 no-patch 结果，证明监督方向有效；但跨 expert transfer 没有改善，说明专家仍未形成统一语言 | 2 seeds：ranking-only top1 19.92%、no-patch 14.06%、diagonal info 57.20%、offdiag 40.69%；supervised top1 23.57%、no-patch 21.22%、diagonal info 63.10%、offdiag 40.52%；trained shared decoder 读 patch/wide 约 92%，读 object/spatial/count 约 55%-59% |
+| Stage W 四种专家对齐机制与训练期 common semantic bus | 共享 semantic decoder 是当前最有效低成本对齐；显式 common bus 可作训练期 teacher/诊断，但不应进入最终推理路径；四机制全开没有超过最小监督 baseline | 2 seeds：ranking-only top1 13.41%；shared grid decoder 22.66%、no-patch 21.88%、offdiag 39.95%、language gap 15.71%；all-four train-only bus top1 21.09%、common bus info 58.58%、`inference_uses_common_bus=false` |
+| Stage X 信息存在、对象化、跨专家互读与最终读头分解诊断 | 问题是多瓶颈叠加：Transformer 能读 patch/wide 语义，但 object slots 没对象化，answer 信息仍弱，最终 scorer 也没充分利用 token | 2 seeds：shared patch/wide Transformer cell info 89.45%/86.36%，object slots 49.78%；object table set exact 0%、最高 recall 11.45%；answer reconstruction 最高 20.96%；frozen scorer raw expert concat 27.08% 高于原 full 22.53% |
+| Stage Y 并行直读输入专家架构修正 | 串联输入专家是错误拓扑；并行直读图像专家明显优于旧串联，但 object/spatial/count 仍未自然分工 | 2 seeds：serial_chain top1 11.07%、parallel_direct 18.62%、merged_direct 14.32%；parallel_direct no-image 12.37%、no-patch 13.02%、no-object/spatial/count 仍 18.62%；answer reconstruction 最高 10.03% |
+| Stage Z 显式监督与训练期教师诊断 | 显式监督让功能专家开始承载任务信息；teacher 提高 top-1，但 student latent 只部分继承 teacher 语义，互读仍未解决 | 2 seeds：baseline_parallel top1 20.31%、supervised_no_teacher 22.66%、supervised_teacher 26.30%；supervised_no_teacher 去掉 object/spatial/count 后降到 12.24%；teacher bus cell info 98.61%、scene exact 80.73%；semantic offdiag 最高 37.42% |
+| Stage AA token 级对齐与互读诊断 | token 对齐显著降低 object/spatial/count 信息丢失，并部分改善互读；但最终 scorer 没充分使用对齐后的功能专家，top-1 未超过简单显式监督 | 2 seeds：supervised_no_teacher top1 24.61%、token_aligned_teacher 22.79%；token_aligned semantic occupied color/shape 65.70%/48.13%，count positive diag 77.69%；no-object/spatial/count 仍 21.09%；teacher retrieval top1 14.28% |
+| Stage AB 文本 latent 对齐、latent-to-answer 专家与 MoE 推理 | prompt/answer 文本 latent 对齐和 latent-to-answer runtime scorer 有正信号；朴素 MoE reasoner 没成功，router 近似均匀且没有形成专家分工 | 2 seeds：text_latent_aligned top1 23.83%，高于 token_aligned_teacher 21.09%；latent-answer candidate top1 15.36%，略高于随机 12.5%；prompt/latent-answer retrieval 只有 3%-4%；MoE top1 20.57%，gate entropy 1.37 接近 log(4)=1.386 |
+| Stage AC Q/A 潜空间、外部信息互译与答案 token 潜空间推理 | 前两步高保真成立，但第三步普通 latent reasoner 失败；这证明“互译能力”不是“潜空间推理能力”的充分条件 | 1 seed：Q/A question/answer exact 均 100%；evidence occupancy/color/shape 为 100%，count table exact 91.80%；latent reasoner full answer 40.04%，no-evidence 27.34%，shuffled-evidence 26.56%；color-only 诊断中前两步 100%，reasoner 仍约 37.5% |
+| Stage AD 只调潜变量推理专家 readout/trace | 只调整 latent reasoner 后出现强正信号：显式 evidence readout 和 trace 监督能把答案 token latent 推理从弱证据使用提升到可用范围；但 selector、count、relation 未完全闭合 | 1 seed：四任务 full answer 74.41%，no/shuffled 均 28.71%；color-only full 91.80%，no 29.30%，shuffled 27.34%；reasoner reader occupancy/color/shape 为 100%，count table 75.20%；relation answer 57.81%，trace relation 51.56% |
+| Stage AE 潜变量推理专家主动读取 agent | 主动读取能启动，且比 readout 更依赖证据；但四任务准确率低于 Stage AD，失败点进一步定位为 query policy，尤其是 relation 的左右对象 query | 1 seed：cell lookup full 90.23%，no 23.44%，shuffled 20.70%；count-only full 83.98%，no 12.11%，shuffled 8.59%；四任务 full 69.73%，no 2.93%，shuffled 29.30%；relation-only full 54.69%，no 61.33%，left/right pair query 34.38%/28.91%，但 pair reader row/col 100%/99.87% |
+| Stage AF MoE 推理专家与分任务阶段训练 | MoE gate 能被监督到 100%，但没有自动修复 query policy；naive staged 严重遗忘，staged+replay 有缓解但低于 mixed/AE/AD | 1 seed：staged full 13.09%，gate 25%，前三任务 0%；mixed MoE full 69.34%，gate 100%；staged+replay full 64.45%，gate 100%；relation-only MoE full 53.12%，no-evidence 61.33%，left/right pair query 35.94%/30.08% |
+| Stage AG Teacher-forced multi-step query trace | 暂停 MoE 是正确方向；teacher-forced query 在四任务上显著打开上限，但自由 query 仍弱，relation-only 仍未被正确 query 解开 | 1 seed：四任务 full 58.79%，no 16.80%，shuffled 21.29%，teacher-forced queries 83.59%；relation-only full 59.77%，no 60.55%，teacher-forced queries 59.77%；pair reader row/col 约 96%-97% |
 
 ## 与世界树计划的概念映射
 
@@ -110,6 +122,42 @@ Fork 的父上下文锚点和 child 执行焦点可以映射到“逻辑树索�
 - Stage U 按这个方向加了 64 个 patch raw tokens、object slot、spatial、counting experts，并 sweep 8/16/32 个 output summary tokens。结果只证明扩大 patch 视觉输入有弱信号：`patch_wide_latent` 为 16.80%/19.04%/18.85%，高于随机 12.50% 和 no-image 13.18%-14.75%，但远未解决多物体关系/计数任务。
 - Stage U 没有证明 learned object/spatial/counting experts 有因果收益：`object_slot_spatial_wide_latent` 只有 output=8 达到 20.80%，output=16/32 低于 patch-wide；`no_object_experts` 基本不降，`no_patch_expert` 掉到 14.06%-15.72%。这说明视觉证据仍主要在 raw patch bus 中，当前 QueryResampler 式 object slot 不能替代对象检测/显式空间专家。
 - Stage U 的 output token sweep 也没有单调收益：patch-wide 最好是 output=16，object variant 最好是 output=8。当前瓶颈不是追加 summary/output tokens 太少，而是上游对象级归纳偏置和监督不足。
+- Stage V 直接测试“潜变量空间是否炸了”：对每个 expert token 训练/评估 16 cell occupancy/color/shape 还原，并做 source expert probe -> target expert transfer。ranking-only 的 diagonal cell info 为 57.20%，offdiag 只有 40.69%，language gap 16.50%，说明 expert 表示确实没有自然统一。
+- Stage V 加共享 semantic decoder 监督后，下游 top1 从 19.92% 提到 23.57%，`no_patch` 从 14.06% 提到 21.22%，diagonal cell info 从 57.20% 提到 63.10%。这证明带监督训练能减少部分信息丢失，并让非 patch 路径承载更多视觉证据。
+- Stage V 同时显示当前监督还没解决“语言不通”：offdiag transfer 40.69% -> 40.52%，没有改善；trained shared decoder 能读 patch/wide 到约 92%，但 object/spatial/count 只有约 55%-59%。所以问题不是单纯输出 scorer 弱，而是 object/spatial/count experts 没有形成可靠对象语义空间。
+- Stage W 测试了四种更强对齐机制：共享 semantic grid decoder、object slot targets、cross-expert contrastive、训练期 common semantic bus。所有 mode 的诊断都保持 `inference_uses_common_bus=false`，最终 scorer 仍直接读 latent，不把显式 bus 当运行时中间层。
+- Stage W 的最强主结果来自最小机制：`shared_grid_decoder` 把 Full Top-1 从 13.41% 提到 22.66%，`no_patch` 从 11.85% 提到 21.88%，且 language gap 从 19.32% 降到 15.71%。这支持“带监督公共读法”作为专家对齐 baseline。
+- Stage W 没有证明四机制叠加更优：`all_four_train_only_bus` 的 common bus 自身 cell info 为 58.58%，但最终 Top-1 为 21.09%，低于 `shared_grid_decoder`；offdiag cell info 也只有 34.98%。因此显式 bus 适合早期 teacher/诊断/蒸馏，不适合作为最终架构的推理依赖。
+- Stage X 把 Stage T/W 的差异拆开：Stage T 的 answer-class reconstruction 证明答案信息可保留；Stage W/X 的 semantic transfer 更严，要求完整场景语义和跨 expert 互读。两者不是同一指标，不能直接拿百分比比较。
+- Stage X 显示 empty-cell baseline 约 59.1%，所以 55%-60% 的 cell info 基本不说明读懂场景。shared + Transformer 能把 patch/wide 分别读到 89.45%/86.36%，occupied color 接近 99%，说明 patch/wide 中确实有真实语义；但 object slots 只有 49.78%，scene exact 为 0，说明对象专家没有成型。
+- Stage X 也显示参数/Transformer 不是唯一答案：MLP large 没有稳定优于 MLP small；Transformer 能读 patch/wide，但不能修复 object slots 或 patch/wide -> object transfer。object table set exact 全部 0%，最高 set recall 只有 11.45%。
+- Stage X 进一步证明最终读头也弱：冻结 token 后单独训练 candidate scorer，shared 模型的 raw expert concat 能到 27.08%，高于原 full 22.53%。因此后续要同时修 objectization、alignment 和 readout，而不是只加一个 loss。
+- Stage Y 修正了一个架构错误：object/spatial/count 等输入专家不应该串在 patch tokens 后面逐级变换，而应该并行直读外部图像；latent reasoner 和 answer scorer 再读这些输入专家输出。`parallel_direct` 从旧串联的 11.07% 提到 18.62%，且 no-image/no-patch 降到接近随机，说明它确实开始使用图像证据。
+- Stage Y 也暴露了新的负结果：`parallel_direct` 去掉 object/spatial/count 后不掉点，answer reconstruction 最高只有 10.03%。拓扑问题修了，但功能专家仍不会自然分工，答案信息也没有充分压进 latent。
+- Stage Z 证明显式监督是必要的：`supervised_no_teacher` 去掉 object/spatial/count 后从 22.66% 掉到 12.24%，说明这些专家开始真正承载任务信息。训练期 teacher 自身很强，cell info 98.61%、scene exact 80.73%，并把 top-1 推到 26.30%。
+- Stage Z 的边界是 teacher 不等于最终解决方案：teacher 主要让 patch/teacher 路径更强，student latent 没完整继承语义；semantic offdiag 最高只有 37.42%，count positive offdiag 还下降，说明显式监督会让专家更专门化，但不会自动生成统一 latent 语言。
+- Stage AA 把 scene/cell teacher 改成同位置 token 对齐后，object/spatial/count 的可读语义明显增强：semantic occupied color/shape 到 65.70%/48.13%，count positive diag 到 77.69%，teacher/cross-expert same-position retrieval 显著高于随机。
+- Stage AA 的新发现是瓶颈从“信息不存在”转向“信息没被用上”：`token_aligned_teacher` top-1 只有 22.79%，低于 `supervised_no_teacher` 24.61%；去掉 object/spatial/count 仍有 21.09%。最终 scorer/route 没把对齐后的功能专家作为主证据。
+- Stage AB 进一步测试输出端：对齐 prompt/answer 文本 latent 并加入 latent-to-answer runtime scorer 后，`text_latent_aligned` 达到 23.83%，高于同轮 `token_aligned_teacher` 21.09%，说明输出端对齐是正向尝试。
+- Stage AB 同时给出两个负结果：latent-answer candidate top-1 只有 15.36%，只是略高于 12.5% 随机；retrieval 只有 3%-4% 且 cosine 很高，存在 collapse 风险。朴素 4-expert MoE reasoner top-1 只有 20.57%，gate entropy 1.37 接近均匀分配，说明“换成 MoE + balance loss”没有形成有效路由。
+- Stage AC 按“问题/答案潜空间 -> 外部信息潜空间 -> 潜空间推理出答案 token -> 文本输出”的新路线重建实验。结果显示第一步和第二步可以同时高保真：问题与答案 token latent 都 100% 还原，外部事实表 latent 也 100% 还原 occupancy/color/shape。
+- Stage AC 的关键负结果是第三步：即使前两步成功，普通 Transformer latent reasoner 在四任务上只有 40.04% answer word exact，no-evidence 为 27.34%，shuffled-evidence 为 26.56%。这说明 reasoner 有弱证据使用，但没有形成可靠潜空间推理。
+- Stage AC 的 color-only 诊断更硬：只做 row/column -> color lookup 时，Q/A 与 evidence codec 都达到 100%，把 reasoner 从 1500 步拉到 5000 步仍约 37%。所以这不是简单训练步数问题。
+- Stage AC 再次证明 cosine 不够：full answer latent cosine 为 94.96%，但答案 exact 只有 40.04%。后续不能把 latent cosine 或 MSE 当作潜空间推理成功证据。
+- Stage AD 只调整 latent reasoner：文本 codec 和 evidence codec 在 reasoner 训练阶段冻结，新增 reasoner 内部的 cell/count readout、trace 监督和 reader 监督。四任务 answer word exact 从 40.04% 提到 74.41%，no/shuffled 均为 28.71%，说明收益来自证据使用。
+- Stage AD 的 color-only 诊断把旧的约 39.45% 提到 91.80%，且 reasoner reader 能从冻结 evidence latent 100% 还原 occupancy/color/shape/count table。这支持新的判断：第三步不是只靠更多训练步数，而是需要能读潜空间证据并把结果写回 answer-token latent 的专门结构。
+- Stage AD 仍未证明完整潜空间推理。target cell trace 只有 62.11%，relation answer 57.81%，trace relation 51.56%；当前 readout 更像可训练的潜空间值读取器，还不是严格的“先选对象/格子 -> 执行比较/计数 -> 输出答案 token latent”的完整链。
+- Stage AE 把第三步改成主动读取 agent：reasoner 先发 query，queryable reader 从冻结 evidence latent 返回 observation，再写 answer-token latent。Cell lookup 达到 90.23%，count-only 达到 83.98%，说明 active read 能启动。
+- Stage AE 四任务 full 为 69.73%，低于 Stage AD 的 74.41%，但 no-evidence 只有 2.93%，比 Stage AD 的 28.71% 更能说明答案依赖外部读取。它牺牲了部分准确率，换来了更接近最终 agent runtime 的证据依赖结构。
+- Stage AE 的核心失败点是 query policy：relation-only 中 pair reader 已能把对象 row/col 读到 100%/99.87%，但 left/right pair query 只有 34.38%/28.91%，且 no-evidence 61.33% 高于 full 54.69%。所以 relation 不是 reader 没信息，而是 reasoner 没学会从问题生成正确对象查询。
+- Stage AE 的高 trace 权重诊断也失败：`reasoner_trace_weight=2.0` 的四任务 full 为 69.34%，没有超过默认 69.73%。后续需要 teacher-forced query、分步 imitation、query contrastive/retrieval，而不是只把 trace loss 乘大。
+- Stage AF 给 active reasoner 加 MoE answer writer 和 relation state writer。Mixed 训练下 MoE gate 能到 100%，但四任务 full 只有 69.34%，没有超过 Stage AE 的 69.73%，说明“专家路由正确”不等于“query policy 正确”。
+- Stage AF 的 naive staged 训练是明确负结果：四任务 full 只有 13.09%，gate accuracy 25%，前三个任务 answer exact 为 0%。这是灾难性遗忘，不是专家分化成功。
+- Stage AF 的 staged+replay 能把 full 拉回 64.45%，gate 100%，说明 replay 能缓解遗忘；但仍低于 mixed MoE，也低于 Stage AE/AD。
+- Stage AF relation-only MoE 仍失败：full 53.12%，no-evidence 61.33%，left/right pair query 35.94%/30.08%。这再次说明 relation 的核心不是缺 MoE 专家，而是缺分步 query policy 和流程监督。
+- Stage AG 暂停 MoE，改为 `trace_multistep` 和 `--query-teacher-forcing train`。四任务 teacher-forced queries 从 full 58.79% 提到 83.59%，说明正确读取 observation 后，answer-token latent 写入路径有明显上限。
+- Stage AG 的自由查询仍然弱：四任务 left/right pair query 只有 35.94%/39.84%，relation trace 52.34%。所以 query policy 仍需要 contrastive/retrieval 或 scheduled sampling，不能只靠 CE。
+- Stage AG 的新负发现是 relation-only teacher forcing 没有打开上限：full 59.77%，teacher-forced queries 59.77%，no-evidence 60.55%。pair reader row/col 已约 97%，说明 relation compare 和 answer latent 写入需要更硬的 row/col/delta/truth-table 中间监督。
 
 ## 推荐下一步
 
@@ -123,9 +171,24 @@ Fork 的父上下文锚点和 child 执行焦点可以映射到“逻辑树索�
 8. 不应继续使用纯 resampler/Attention Pump 作为唯一信息通道；如果要压缩，也必须有 residual passthrough 或 object/slot token 保真旁路。
 9. Stage U 已经说明“只加 learned object slot/counting resampler”不够；下一步应直接切到带辅助监督的 object slot、detector/segmentation/grounding expert，或至少加入 occupancy、color、shape、cell/box、count 辅助 loss。
 10. L3/L4 位置组合和 counting 下一步仍应保留 raw patch evidence tokens，同时让更强 object/spatial/counting experts 产生可验证的对象表或对象 token；不要再把纯 resampler 当作唯一对象归纳偏置。
-11. DocVQA 下一步应接入预训练专家：OCR/text/layout encoder 或现有 VLM，把高分辨率文档理解交给专家，再测试 latent bus 与 agent decoder。
-12. 真实工具边界可并行推进：用 Playwright/本地 HTML 页面替换合成 UI+DOM DSL，保留截图 + DOM + 工具历史 + latent bottleneck 的评估结构。
-13. 证据审计下一步应接入真实文件形态：小型 HTML/PDF/CSV/截图组合，要求模型调用受控工具抽取证据并输出带引用的 audit report。
-14. 如果继续走真实多模态路线，应把 Stage D 的短期 legend 扩展成局部地图记忆：加入遮挡、错误探测、不可重置探测成本、探索路径规划和多目标任务。
-15. 如果要继续验证 KV 剪枝，需要选定一个可控推理服务栈，确认是否暴露 prefix/segment 级 KV 生命周期 API。
-16. 若要验证潜空间训练路线，应单独建训练实验，不要把未验证训练假设混入现有 work-tree runtime。
+11. Stage V 之后，所有新增 expert 都应先通过信息还原和 cross-expert transfer 诊断，再看最终任务准确率；否则容易把 raw patch/wide latent 的收益误判成 expert 收益。
+12. Stage W 之后，common semantic bus 只能作为初期训练 teacher、诊断器或蒸馏目标；最终 scorer/输出专家仍应直读 latent。contrastive alignment 与 slot-level targets 需要继续做，但要避免把显式公共语义表变成运行时主路径。
+13. Stage Y 之后，输入专家拓扑应固定为“外部信息直读 -> latent reasoner -> latent 输出/answer scorer”，不要再回到 Stage U 那种串联专家链路。
+14. Stage Z/AA 之后，object/spatial/count 专家应保留显式监督和 token-level 对齐，但蒸馏目标要从全局 scene/cell bus 继续下沉到 object/cell-level，例如 DETR-like set prediction、Hungarian matching、objectness、cell/box、color、shape 和同对象 token contrastive。
+15. Stage AA/AB 之后，下一步重点应改最终 aggregator/scorer：让答案候选显式 cross-attend 到 object/spatial/count 的 aligned cell/object tokens，或者加入 expert usage supervision；继续只加全局 align loss 的边际收益已经很低。
+16. Stage AB 之后，latent-to-answer 专家应从轻量候选 scorer 升级为更强的 contrastive/autoregressive 输出专家；同时要控制 latent/answer cosine collapse，不能只看 cosine 高。
+17. Stage AB 之后，MoE router 需要任务族、证据类型或专家使用监督；不要再只把普通 reasoner 替换成 MoE 并加 balance loss。
+18. Stage AC/AD/AE 之后，第三步必须单独设计训练目标：target cell token、selected object token、count accumulator、relation pair token 等中间 latent 操作应被显式监督。
+19. Stage AC/AD/AE 之后，evidence latent 不能只要求“decoder 能读出事实”；它还必须对 reasoner 可操作，例如固定 cell/object/count-pair token 坐标、可检索对象表或可微 lookup 结构。Stage AD/AE 已证明 reasoner 内部 readout/queryable reader 是正向路径，但 selector 和 query policy 还没严格对齐。
+20. Stage AC/AD/AE 之后，answer-token latent 需要离散分离或 token-level contrastive 约束；只用 MSE/cosine 靠近答案 latent 会产生高 cosine、低 exact 的假成功。
+21. Stage AG 之后，不应继续优先做 MoE；先把 query policy 和 compare trace 训练扎实，再考虑专家路由。
+22. Stage AG 之后，relation 应加入更硬的中间监督：left row/col、right row/col、row delta、col delta、relation truth table 或 compare logits。
+23. Stage AG 之后，query 应使用 contrastive/retrieval loss 和 scheduled sampling；teacher forcing 只能作为启动监督，不能替代 runtime 自由查询。
+24. Stage AF 之后，若继续 staged 训练，必须有 replay buffer、蒸馏、正则化或冻结策略；不要再做单向无 replay 的阶段训练。
+25. Stage AC/AD/AE/AF/AG 下一轮应加入 direct structured baseline，确认任务本身和训练预算不是瓶颈。
+26. DocVQA 下一步应接入预训练专家：OCR/text/layout encoder 或现有 VLM，把高分辨率文档理解交给专家，再测试 latent bus 与 agent decoder。
+27. 真实工具边界可并行推进：用 Playwright/本地 HTML 页面替换合成 UI+DOM DSL，保留截图 + DOM + 工具历史 + latent bottleneck 的评估结构。
+28. 证据审计下一步应接入真实文件形态：小型 HTML/PDF/CSV/截图组合，要求模型调用受控工具抽取证据并输出带引用的 audit report。
+29. 如果继续走真实多模态路线，应把 Stage D 的短期 legend 扩展成局部地图记忆：加入遮挡、错误探测、不可重置探测成本、探索路径规划和多目标任务。
+30. 如果要继续验证 KV 剪枝，需要选定一个可控推理服务栈，确认是否暴露 prefix/segment 级 KV 生命周期 API。
+31. 若要验证潜空间训练路线，应单独建训练实验，不要把未验证训练假设混入现有 work-tree runtime。
