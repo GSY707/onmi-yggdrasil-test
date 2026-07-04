@@ -9,7 +9,7 @@
 
 | 路径 | 用途 |
 | --- | --- |
-| `README.md` | 运行方式、验证边界与记忆树口径 |
+| `README.md` | 项目简短介绍、近期图像生成/编辑成果、Stage E+F 多模态融合成功结果、目标路线、初步证明和最小验证入口 |
 | `docs/from-scratch-training-vram-quantization.md` | 从 0 训练完整架构验证的显存、量化、省显存边界和最低价整机购卡建议 |
 | `pyproject.toml` | Python 测试配置、pytest 可选依赖、DocVQA 数据读取可选依赖与预训练/LLaVA 实验依赖 |
 | `.gitignore` | 忽略本地虚拟环境、pytest 缓存、大模型 checkpoint 和本地 HF token 文件 |
@@ -46,7 +46,9 @@
 | `experiments/omni_transformer_stage_z_supervised_teacher_diagnostics.py` | Stage Z 显式监督与训练期教师实验：object/spatial/count 专家监督、teacher distillation、信息丢失和潜变量互读诊断 |
 | `experiments/omni_transformer_stage_aa_token_alignment_diagnostics.py` | Stage AA token 级对齐实验：teacher/cross-expert same-position contrastive、信息丢失和潜变量互读诊断 |
 | `experiments/omni_transformer_stage_ab_text_moe_alignment.py` | Stage AB 文本 latent 对齐、latent-to-answer 输出专家和 MoE 推理实验：对齐 prompt/answer latent、候选答案 latent scorer 与 routed reasoner |
-| `experiments/omni_transformer_stage_ac_latent_reasoning.py` | Stage AC/AD/AE/AF/AG Q/A 潜空间、外部信息互译与答案 token 潜空间推理实验：分阶段训练 text codec、evidence codec、latent reasoner，并支持 reasoner-only readout/trace、active-read agent、MoE staged、teacher-forced multi-step query trace 变体与 no/shuffled evidence 门禁 |
+| `experiments/omni_transformer_stage_ac_latent_reasoning.py` | Stage AC/AD/AE/AF/AG/AH Q/A 潜空间、外部信息互译与答案 token 潜空间推理实验：分阶段训练 text codec、evidence codec、latent reasoner，并支持 reasoner-only readout/trace、active-read agent、MoE staged、teacher-forced multi-step query trace、query alignment/process supervision 消融与 no/shuffled evidence 门禁 |
+| `experiments/omni_transformer_stage_ai_image_generation_editing.py` | Stage AI 图像生成与源图编辑输出专家实验：prompt direct、latent output、latent image edit、no-source/source-no-edit 消融与 36 小时时间上限 |
+| `experiments/omni_transformer_stage_aj_transformer_image_io_fidelity.py` | Stage AJ Transformer 图像输入到 latent 再完整重绘保真实验：patch-token image encoder、fixed latent baseline、记忆树式逐层残差 latent、copy/edit/generation 对象属性/mask 辅助监督、Transformer patch decoder、no-source 消融、批量 GPU template parser 与前景/背景分解指标 |
 | `src/latent_space_agent_feasibility/` | 纯 Python 原型，实现 LOD、注意力泵、主动采样、记忆树节点/关联边、KV 分支剪枝、离线对齐与渐进式生成计划 |
 | `tests/` | 可运行验证用例，覆盖白皮书核心命题的接口和不变量 |
 | `artifacts/text_to_latent_thought/results.json` | 训练实验结果；运行脚本后生成，不保存模型 checkpoint |
@@ -173,7 +175,43 @@
 | `artifacts/omni_transformer_stage_ag_teacher_forced_trace/relation_only_runs/` | Stage AG relation-only 每次 run 明细 JSON |
 | `artifacts/omni_transformer_stage_ag_teacher_forced_trace/all_trace_results.json` | Stage AG 四任务 teacher-forced multi-step query trace 聚合结果，含 full/no/shuffled 与 teacher-forced query 上限 |
 | `artifacts/omni_transformer_stage_ag_teacher_forced_trace/all_trace_runs/` | Stage AG 四任务每次 run 明细 JSON |
-| `docs/feasibility-report.md` | 中文可行性结论、关联项目概念映射、截至 Stage AG 的全部实验结论和未证明边界 |
+| `artifacts/omni_transformer_stage_ah_query_process_ablation/smoke_results.json` | Stage AH query/process 新指标 smoke 聚合结果 |
+| `artifacts/omni_transformer_stage_ah_query_process_ablation/smoke_runs/` | Stage AH smoke 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_ah_query_process_ablation/relation_query_alignment_results.json` | Stage AH relation-only CLIP-style query alignment 聚合结果，显示 query 小幅改善但 reader 被破坏 |
+| `artifacts/omni_transformer_stage_ah_query_process_ablation/relation_query_alignment_runs/` | Stage AH query alignment 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_ah_query_process_ablation/relation_process_results.json` | Stage AH relation-only process supervision 聚合结果，显示 teacher-forced compare 上限改善 |
+| `artifacts/omni_transformer_stage_ah_query_process_ablation/relation_process_runs/` | Stage AH process supervision 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_ah_query_process_ablation/relation_combined_results.json` | Stage AH relation-only query alignment + process supervision 聚合结果，显示组合未叠加收益 |
+| `artifacts/omni_transformer_stage_ah_query_process_ablation/relation_combined_runs/` | Stage AH combined 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_ah_query_process_ablation/relation_query_alignment_detached_results.json` | Stage AH detached-key query alignment 聚合结果，显示固定 evidence key 可保住 reader 但 query 改善不足 |
+| `artifacts/omni_transformer_stage_ah_query_process_ablation/relation_query_alignment_detached_runs/` | Stage AH detached-key query alignment 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_ah_query_process_ablation/all_process_results.json` | Stage AH 四任务 process-only 聚合结果，显示 process supervision 对 full 和 teacher-forced 上限的影响 |
+| `artifacts/omni_transformer_stage_ah_query_process_ablation/all_process_runs/` | Stage AH 四任务 process-only 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_ai_image_generation_editing/result.json` | Stage AI 单 seed GPU 图像生成/编辑早期结果，保留为正式 sweep 前的参考 |
+| `artifacts/omni_transformer_stage_ai_image_generation_editing/smoke_result.json` | Stage AI 小规模 smoke 结果，用于快速验证脚本、GPU、JSON 和 PNG 输出链路 |
+| `artifacts/omni_transformer_stage_ai_image_generation_editing/samples/result/` | Stage AI 正式单 seed 的源图、目标图、prompt direct、latent output、latent image edit 和 no-source PNG 样例 |
+| `artifacts/omni_transformer_stage_ai_image_generation_editing/samples/smoke_result/` | Stage AI smoke 的独立 PNG 样例，避免覆盖正式结果样例 |
+| `artifacts/omni_transformer_stage_ai_image_generation_editing/sweep_results.json` | Stage AI 36 小时内正式 sweep 聚合结果；3 seeds 主任务均 100%，用于证明该任务已饱和 |
+| `artifacts/omni_transformer_stage_ai_image_generation_editing/sweep_runs/` | Stage AI 多 seed sweep 每次 run 明细 JSON 与对应样例 |
+| `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/result.json` | Stage AJ 中等单 seed Transformer 图像 IO 保真结果，含 copy/edit、foreground/background MSE、nearest scene 和消融 |
+| `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/smoke_result.json` | Stage AJ 小规模 smoke 结果，用于快速验证脚本、GPU、JSON 和 PNG 输出链路 |
+| `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/memory_tree_smoke_result.json` | Stage AJ 记忆树式逐层残差 latent smoke 结果，验证 memory_tree_copy/edit 训练、JSON 和 PNG 输出链路 |
+| `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/supervised_copy_smoke_result.json` | Stage AJ copy-only 辅助监督 smoke 结果，验证 memory_tree_supervised_copy、对象属性/mask 辅助 loss、JSON 和 PNG 输出链路 |
+| `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/supervised_copy_probe_result.json` | Stage AJ copy-only 辅助监督中等 probe 结果；memory_tree_supervised_copy 达到 scene exact 100%、foreground MSE 0.005730、aux scene/mask IoU 100% |
+| `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/formal_supervised_copy_result.json` | Stage AJ copy-only 辅助监督正式单 seed 结果；memory_tree_supervised_copy 达到 scene exact 100%、foreground MSE 0.000794、aux scene/mask IoU 100% |
+| `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/supervised_edit_generate_smoke_result.json` | Stage AJ 监督 edit/generation smoke 结果，验证 memory_tree_supervised_edit、text_supervised_generate、no-source 消融和样例输出链路 |
+| `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/supervised_edit_generate_probe_result.json` | Stage AJ 监督 edit/generation 中等 probe 结果；edit scene exact 99.22%、edit no-source 5.08%、text generation 100% |
+| `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/samples/result/` | Stage AJ 中等单 seed 的 background/source/target、transformer copy/edit/no-source PNG 样例 |
+| `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/samples/smoke_result/` | Stage AJ smoke 的独立 PNG 样例 |
+| `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/samples/memory_tree_smoke_result/` | Stage AJ memory-tree smoke 的独立 PNG 样例 |
+| `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/samples/supervised_copy_smoke_result/` | Stage AJ copy-only 辅助监督 smoke 的独立 PNG 样例 |
+| `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/samples/supervised_copy_probe_result/` | Stage AJ copy-only 辅助监督 probe 的 source/target/copy PNG 样例 |
+| `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/samples/formal_supervised_copy_result/` | Stage AJ copy-only 辅助监督正式单 seed 的 source/target/copy PNG 样例 |
+| `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/samples/supervised_edit_generate_smoke_result/` | Stage AJ 监督 edit/generation smoke 的 source/target/edit/generate PNG 样例 |
+| `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/samples/supervised_edit_generate_probe_result/` | Stage AJ 监督 edit/generation probe 的随机背景 edit、no-source 和规范背景 generation PNG 样例 |
+| `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/formal_memory_tree_result.json` | Stage AJ 单 seed memory-tree 正式长训结果；edit scene exact 11.91%、no-source 3.71%、copy 0.59%，说明编辑信号增强但完整重绘保真失败 |
+| `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/samples/formal_memory_tree_result/` | Stage AJ memory-tree 正式长训 PNG 样例，含 background/source/target、copy/edit/no-source 输出 |
+| `docs/feasibility-report.md` | 中文可行性结论、关联项目概念映射、截至 Stage AJ 的全部实验结论和未证明边界 |
 | `docs/from-scratch-training-vram-quantization.md` | 从 0 训练完整架构验证的显存档位、量化收益、无效量化、购卡优先级和正式验证下限 |
 | `docs/text-to-latent-thought-experiment.md` | 纯文本思考训练迁移到特殊 latent token 内部思考的本机 GPU 实验报告 |
 | `docs/heterogeneous-latent-input-experiment.md` | 文本动作 + 非文本地形 tensor 的异构输入潜变量实验报告，说明可行性证据与非优劣对照边界 |
@@ -209,6 +247,10 @@
 | `docs/omni-transformer-stage-ae-active-read-agent-experiment.md` | Stage AE 潜变量推理专家主动读取 agent 报告，说明 active read 正信号、证据依赖增强和 query policy 失败点 |
 | `docs/omni-transformer-stage-af-moe-staged-reasoner-experiment.md` | Stage AF MoE 推理专家与分任务阶段训练报告，说明 gate 可训、staged 遗忘、replay 缓解和 relation query 仍失败 |
 | `docs/omni-transformer-stage-ag-teacher-forced-query-trace-experiment.md` | Stage AG teacher-forced multi-step query trace 报告，说明正确读取后的上限、自由 query 瓶颈和 relation compare 负结果 |
+| `docs/omni-transformer-stage-ah-query-process-ablation-experiment.md` | Stage AH query alignment 与 process supervision 逐项消融报告，说明各自修复的问题与副作用 |
+| `docs/omni-transformer-stage-ai-image-generation-editing-experiment.md` | Stage AI 图像生成与源图编辑输出专家报告，说明正式 sweep 饱和、消融有效和真实图像外推边界 |
+| `docs/omni-transformer-stage-aj-transformer-image-io-fidelity-experiment.md` | Stage AJ Transformer 图像输入到 latent 再完整重绘保真报告，说明 fixed baseline 负结果、memory-tree 正式长训信号、copy 门禁失败、copy/edit/generation 辅助监督正信号和下一步对象保真门禁 |
+| `docs/archive/README-2026-07-04-legacy-command-list.md` | 2026-07-04 重写 README 前的旧版命令清单和逐阶段实验链接归档，仅作记录性查阅 |
 | `docs/DIRECTORY_REFERENCE.md` | 当前文件，保持测试工作区结构可检索 |
 
 ## 目录树
@@ -248,12 +290,16 @@
 |   |-- omni_transformer_stage_aa_token_alignment_diagnostics.py
 |   |-- omni_transformer_stage_ab_text_moe_alignment.py
 |   |-- omni_transformer_stage_ac_latent_reasoning.py
+|   |-- omni_transformer_stage_ai_image_generation_editing.py
+|   |-- omni_transformer_stage_aj_transformer_image_io_fidelity.py
 |   |-- text_to_latent_sweep.py
 |   |-- text_to_latent_thought.py
 |   |-- visual_multimodal_stage_ab.py
 |   |-- visual_multimodal_stage_c.py
 |   `-- visual_multimodal_stage_d.py
 |-- docs/
+|   |-- archive/
+|   |   `-- README-2026-07-04-legacy-command-list.md
 |   |-- DIRECTORY_REFERENCE.md
 |   |-- feasibility-report.md
 |   |-- from-scratch-training-vram-quantization.md
@@ -289,6 +335,9 @@
 |   |-- omni-transformer-stage-ae-active-read-agent-experiment.md
 |   |-- omni-transformer-stage-af-moe-staged-reasoner-experiment.md
 |   |-- omni-transformer-stage-ag-teacher-forced-query-trace-experiment.md
+|   |-- omni-transformer-stage-ah-query-process-ablation-experiment.md
+|   |-- omni-transformer-stage-ai-image-generation-editing-experiment.md
+|   |-- omni-transformer-stage-aj-transformer-image-io-fidelity-experiment.md
 |   |-- text-to-latent-thought-experiment.md
 |   |-- visual-multimodal-stage-ab-experiment.md
 |   |-- visual-multimodal-stage-c-experiment.md
@@ -305,6 +354,7 @@
 
 | 想找什么 | 看哪里 |
 | --- | --- |
+| 项目简短介绍、近期图像生成/编辑成果、Stage E+F 多模态融合成功结果、目标路线和初步证明 | `README.md` |
 | 多模态潜空间架构是否可行 | `docs/feasibility-report.md` |
 | 从 0 训练完整架构验证至少需要多少显存、量化能省多少、最低价整机买什么显卡 | `docs/from-scratch-training-vram-quantization.md` |
 | 纯文本训练迁移到特殊 latent token 内部思考是否可行 | `experiments/text_to_latent_thought.py` 与 `artifacts/text_to_latent_thought/results.json` |
@@ -380,8 +430,15 @@
 | Stage AF gate 可训、staged 遗忘、replay 缓解和 relation query 仍失败 | `docs/omni-transformer-stage-af-moe-staged-reasoner-experiment.md` |
 | Stage AG teacher-forced multi-step query trace 实验 | `experiments/omni_transformer_stage_ac_latent_reasoning.py` 与 `artifacts/omni_transformer_stage_ag_teacher_forced_trace/` |
 | Stage AG 正确读取后的上限、自由 query 瓶颈和 relation compare 负结果 | `docs/omni-transformer-stage-ag-teacher-forced-query-trace-experiment.md` |
+| Stage AH query alignment 与 process supervision 逐项消融实验 | `experiments/omni_transformer_stage_ac_latent_reasoning.py` 与 `artifacts/omni_transformer_stage_ah_query_process_ablation/` |
+| Stage AH 各思路分别修复了哪些问题与带来哪些副作用 | `docs/omni-transformer-stage-ah-query-process-ablation-experiment.md` |
+| Stage AI 图像生成与源图编辑输出专家实验 | `experiments/omni_transformer_stage_ai_image_generation_editing.py` 与 `artifacts/omni_transformer_stage_ai_image_generation_editing/` |
+| Stage AI 低熵图像生成/编辑任务饱和与消融结论 | `docs/omni-transformer-stage-ai-image-generation-editing-experiment.md` |
+| Stage AJ Transformer 图像 IO 保真实验 | `experiments/omni_transformer_stage_aj_transformer_image_io_fidelity.py` 与 `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/` |
+| Stage AJ fixed baseline 负结果、memory-tree 正式长训、copy 门禁失败与 copy/edit/generation 辅助监督正信号 | `docs/omni-transformer-stage-aj-transformer-image-io-fidelity-experiment.md` |
 | 本轮 GPU 训练实验结论 | `docs/text-to-latent-thought-experiment.md` |
 | 如何运行验证 | `README.md` |
+| 旧 README 的逐阶段长命令清单 | `docs/archive/README-2026-07-04-legacy-command-list.md` |
 | LOD 统一维度与正交层级编码 | `src/latent_space_agent_feasibility/core.py` 的 `mean_pool_lod`、`lod_embedding` |
 | MoE 变长专家输出聚合 | `src/latent_space_agent_feasibility/core.py` 的 `CrossAttentionPump` |
 | 主动采样与记忆树写入 | `src/latent_space_agent_feasibility/core.py` 的 `HierarchicalMediaIndex`、`MemoryTree` |

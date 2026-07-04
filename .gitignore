@@ -6,3 +6,4 @@ artifacts/**/*.pt
 artifacts/**/*.pth
 HF token.txt
 artifacts
+thinking

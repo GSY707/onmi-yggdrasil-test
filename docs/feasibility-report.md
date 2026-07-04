@@ -18,7 +18,7 @@
 
 ## 结论
 
-整体结论：白皮书里的工程方向有可落地的接口骨架，最适合作为 `世界树计划` 现有工作树、记忆树、Fork runtime 的下一层实验分支；但其中“潜空间自我对齐”“真实多模态推理主导权转移”“provider KV Cache 物理剪枝”还没有被本轮验证证明，需要真实模型、服务端 KV API 或训练实验。Stage Y 到 AG 的新结论进一步收窄了路线：输入专家应并行直读外部信息，显式监督和 token/text 对齐都有正信号；Q/A 与外部信息互译可以做到高保真，但普通 latent reasoner 不能自动完成答案 token 潜空间推理。只调 latent reasoner、加入显式 readout/trace 后有强正信号；主动读取 agent 后证据依赖性更强，但 query policy 尤其是 relation 的左右对象查询还没有闭合。MoE gate 可以学会任务族路由，但 naive 分阶段训练会灾难性遗忘，replay 只能部分缓解。Teacher-forced multi-step query trace 在四任务上打开了正确读取后的上限，但 relation-only 仍暴露 compare/answer 写入缺少足够硬的中间监督。
+整体结论：白皮书里的工程方向有可落地的接口骨架，最适合作为 `世界树计划` 现有工作树、记忆树、Fork runtime 的下一层实验分支；但其中“潜空间自我对齐”“真实多模态推理主导权转移”“provider KV Cache 物理剪枝”还没有被本轮验证证明，需要真实模型、服务端 KV API 或训练实验。Stage Y 到 AJ 的新结论进一步收窄了路线：输入专家应并行直读外部信息，显式监督和 token/text 对齐都有正信号；Q/A 与外部信息互译可以做到高保真，但普通 latent reasoner 不能自动完成答案 token 潜空间推理。只调 latent reasoner、加入显式 readout/trace 后有强正信号；主动读取 agent 后证据依赖性更强，但 query policy 尤其是 relation 的左右对象查询还没有闭合。MoE gate 可以学会任务族路由，但 naive 分阶段训练会灾难性遗忘，replay 只能部分缓解。Teacher-forced multi-step query trace 在四任务上打开了正确读取后的上限；逐项消融进一步说明 process supervision 能修正确读取后的 compare 上限，朴素 CLIP-style query alignment 只能小幅改善 query，且容易破坏 evidence reader。Stage AI 把验证切到图像输出专家后很快饱和，只能证明低熵图像生成/编辑链路能闭合；Stage AJ 改成全 Transformer patch 输入、latent 和 patch decoder 后，无辅助监督 memory-tree 仍丢对象，但对象属性/mask 辅助监督能把合成源图完整重绘打到 100%，并在 probe 规模把编辑推到 99.22%、规范背景文本生成推到 100%。编辑/生成仍需正式长训和更复杂数据验证。
 
 | 命题 | 本轮结果 | 证据 |
 | --- | --- | --- |
@@ -65,6 +65,9 @@
 | Stage AE 潜变量推理专家主动读取 agent | 主动读取能启动，且比 readout 更依赖证据；但四任务准确率低于 Stage AD，失败点进一步定位为 query policy，尤其是 relation 的左右对象 query | 1 seed：cell lookup full 90.23%，no 23.44%，shuffled 20.70%；count-only full 83.98%，no 12.11%，shuffled 8.59%；四任务 full 69.73%，no 2.93%，shuffled 29.30%；relation-only full 54.69%，no 61.33%，left/right pair query 34.38%/28.91%，但 pair reader row/col 100%/99.87% |
 | Stage AF MoE 推理专家与分任务阶段训练 | MoE gate 能被监督到 100%，但没有自动修复 query policy；naive staged 严重遗忘，staged+replay 有缓解但低于 mixed/AE/AD | 1 seed：staged full 13.09%，gate 25%，前三任务 0%；mixed MoE full 69.34%，gate 100%；staged+replay full 64.45%，gate 100%；relation-only MoE full 53.12%，no-evidence 61.33%，left/right pair query 35.94%/30.08% |
 | Stage AG Teacher-forced multi-step query trace | 暂停 MoE 是正确方向；teacher-forced query 在四任务上显著打开上限，但自由 query 仍弱，relation-only 仍未被正确 query 解开 | 1 seed：四任务 full 58.79%，no 16.80%，shuffled 21.29%，teacher-forced queries 83.59%；relation-only full 59.77%，no 60.55%，teacher-forced queries 59.77%；pair reader row/col 约 96%-97% |
+| Stage AH Query alignment 与 process supervision 消融 | Process supervision 修了正确读取后的 compare 上限；朴素 CLIP-style query alignment 只小幅修 query，且会破坏 reader；detached-key 能保住 reader 但 query 改善不足 | 1 seed：relation query-only left/right 46.48%/47.27% 但 pair reader row/col 38.72%/34.74%；process-only teacher-forced 66.80%，row/col forced 100%；四任务 process-only full 62.70%，teacher-forced 84.18% |
+| Stage AI 图像生成与源图编辑输出专家 | 低熵合成图像生成/编辑链路可闭合，但正式 sweep 已饱和，不能继续区分 direct、latent output 或编辑架构强弱 | 3 seeds：prompt_direct、latent_output、latent_image_edit 的 nearest/head scene exact 均 100%；no-source nearest scene exact 3.42%，source-no-edit 0%；平均总耗时 250.092 秒，未触发 36 小时时间上限 |
+| Stage AJ Transformer 图像 IO 保真 | 全 Transformer patch 输入到 latent 再 patch decoder 完整重绘的链路可跑通；无辅助监督 memory-tree 有源图依赖但 copy 失败；对象属性/mask 辅助监督闭合 copy，并在 probe 规模打开 edit/generation | fixed baseline：transformer_edit scene exact 3.12%、transformer_copy 0%；无辅助 memory-tree：edit 11.91%、copy 0.59%；supervised copy formal：scene exact 100%、foreground MSE 0.000794；supervised edit/generate probe：edit 99.22%、edit no-source 5.08%、text generate 100% |
 
 ## 与世界树计划的概念映射
 
@@ -158,6 +161,21 @@ Fork 的父上下文锚点和 child 执行焦点可以映射到“逻辑树索�
 - Stage AG 暂停 MoE，改为 `trace_multistep` 和 `--query-teacher-forcing train`。四任务 teacher-forced queries 从 full 58.79% 提到 83.59%，说明正确读取 observation 后，answer-token latent 写入路径有明显上限。
 - Stage AG 的自由查询仍然弱：四任务 left/right pair query 只有 35.94%/39.84%，relation trace 52.34%。所以 query policy 仍需要 contrastive/retrieval 或 scheduled sampling，不能只靠 CE。
 - Stage AG 的新负发现是 relation-only teacher forcing 没有打开上限：full 59.77%，teacher-forced queries 59.77%，no-evidence 60.55%。pair reader row/col 已约 97%，说明 relation compare 和 answer latent 写入需要更硬的 row/col/delta/truth-table 中间监督。
+- Stage AH 逐项验证后，process supervision 是当前最干净的正信号：relation-only teacher-forced 从 59.77% 提到 66.80%，四任务 full 从 58.79% 到 62.70%，teacher-forced 从 83.59% 到 84.18%，且 no-evidence 仍约 16.60%。
+- Stage AH 的朴素 CLIP-style query alignment 有副作用：left/right query 从约 35%/45% 提到 46.48%/47.27%，但 pair reader row/col 掉到 38.72%/34.74%，说明 query-object 对齐会破坏 evidence token 可读性。
+- Stage AH detached-key query alignment 保住 reader row/col 到 98.40%/96.15%，但 query 只有 39.06%/41.80%。所以“冻结 evidence tower，只训 query tower”方向更安全，但当前训练信号仍不够强。
+- Stage AH combined 没有叠加收益：teacher-forced 只有 59.77%，说明 query alignment、reader loss、process loss 的梯度目标互相牵制。下一步应改成分阶段预训练，而不是同时加权。
+- Stage AI 证明了低熵图像输出链路能闭合，但正式 sweep 已经饱和：prompt direct、latent output、latent image edit 都达到 100% scene exact。因此它不能再证明 latent 输出专家更优，也不能外推到真实图像生成能力。
+- Stage AI 的 no-source/source-no-edit 消融仍有效：no-source 只有 3.42%，source-no-edit 为 0%，说明源图编辑不是简单猜测或复制。但任务仍只是 64x64 单物体合成图，不含自然图像、多对象、遮挡、局部 mask、风格迁移或扩散采样。
+- Stage AJ 更贴近“整图输入 -> latent -> 完整重绘”，fixed baseline 结果是负的：Transformer patch decoder 可以学到背景纹理，foreground/object 保真失败；`transformer_edit` scene exact 只有 3.12%，`transformer_copy` 为 0%。
+- Stage AJ 暴露了一个指标风险：全图 pixel MSE 会被背景主导。`transformer_edit` 的 background MSE 只有 0.002343，但 foreground MSE 是 0.182054，说明只看全图误差会掩盖对象语义失败。
+- Stage AJ 的 `memory_tree_copy/memory_tree_edit` 正式单 seed 已完成：edit scene exact 从 fixed baseline 的 3.12% 提升到 11.91%，no-source 只有 3.71%，说明源图依赖增强；但 copy scene exact 只有 0.59%，foreground MSE 0.222561，完整重绘保真仍未闭合。
+- Stage AJ 的 memory-tree 正信号主要来自位置编辑：`position_edit` scene exact 为 28.02%，`color_edit` 只有 1.95%，`shape_edit` 只有 3.98%。视觉抽检也显示生成的是模糊物体或多重影子，而不是稳定对象。
+- Stage AJ 的 copy-only 辅助监督是强正信号：`memory_tree_supervised_copy` 在 4096/512/512、1500 step 正式单 seed 上达到 test scene exact 100%、foreground MSE 0.000794、aux scene 100%、aux mask IoU 100%。这说明 copy 失败点主要是 latent 没有对象表约束，而不是 Transformer patch decoder 无法重绘对象。
+- Stage AJ 的监督 edit/generation probe 进一步打开能力边界：`memory_tree_supervised_edit` 在 2048/256/256、600 step 上达到 scene exact 99.22%，而 no-source 只有 5.08%，说明源图 latent 对保留未修改属性和背景有因果作用；`text_supervised_generate` 在规范背景上达到 100% scene exact。
+- Stage AJ 的 edit/generation 仍不是正式长训结论：d_model 192、4096/512、edit/generate 各 1500 step 的正式 run 超过 30 分钟工具超时且没有写出 JSON，已停止残留进程。
+- Stage AJ 训练瓶颈曾被评估路径放大：旧版 nearest-template 指标逐样本构造 120 个候选图，并在一个 batch 内重复解析两遍，导致 CPU/Python 调度拖住 GPU。现已改为批量 GPU template parser、训练期 `train_eval_size` 子集和 `--torch-num-threads 1`。
+- Stage AI/AJ 都不能外推到人类审美质量、真实照片保真度或复杂编辑一致性。后续必须加入 foreground/object/scene exact、样例 PNG、局部保持、完整复制和编辑一致性门禁。
 
 ## 推荐下一步
 
@@ -181,9 +199,9 @@ Fork 的父上下文锚点和 child 执行焦点可以映射到“逻辑树索�
 18. Stage AC/AD/AE 之后，第三步必须单独设计训练目标：target cell token、selected object token、count accumulator、relation pair token 等中间 latent 操作应被显式监督。
 19. Stage AC/AD/AE 之后，evidence latent 不能只要求“decoder 能读出事实”；它还必须对 reasoner 可操作，例如固定 cell/object/count-pair token 坐标、可检索对象表或可微 lookup 结构。Stage AD/AE 已证明 reasoner 内部 readout/queryable reader 是正向路径，但 selector 和 query policy 还没严格对齐。
 20. Stage AC/AD/AE 之后，answer-token latent 需要离散分离或 token-level contrastive 约束；只用 MSE/cosine 靠近答案 latent 会产生高 cosine、低 exact 的假成功。
-21. Stage AG 之后，不应继续优先做 MoE；先把 query policy 和 compare trace 训练扎实，再考虑专家路由。
-22. Stage AG 之后，relation 应加入更硬的中间监督：left row/col、right row/col、row delta、col delta、relation truth table 或 compare logits。
-23. Stage AG 之后，query 应使用 contrastive/retrieval loss 和 scheduled sampling；teacher forcing 只能作为启动监督，不能替代 runtime 自由查询。
+21. Stage AH 之后，不应继续优先做 MoE；先把 query policy 和 compare trace 训练扎实，再考虑专家路由。
+22. Stage AH 之后，relation compare 应继续加强 truth-table / delta / op 的直接监督；process supervision 已有正信号，但 delta row/col 仍低。
+23. Stage AH 之后，CLIP-style query alignment 应分阶段做：冻结 evidence codec/pair reader，先把 query retrieval 训到 90%+，再接 answer writer；不要把 retrieval loss、reader loss、process loss 一起混训。
 24. Stage AF 之后，若继续 staged 训练，必须有 replay buffer、蒸馏、正则化或冻结策略；不要再做单向无 replay 的阶段训练。
 25. Stage AC/AD/AE/AF/AG 下一轮应加入 direct structured baseline，确认任务本身和训练预算不是瓶颈。
 26. DocVQA 下一步应接入预训练专家：OCR/text/layout encoder 或现有 VLM，把高分辨率文档理解交给专家，再测试 latent bus 与 agent decoder。
@@ -192,3 +210,9 @@ Fork 的父上下文锚点和 child 执行焦点可以映射到“逻辑树索�
 29. 如果继续走真实多模态路线，应把 Stage D 的短期 legend 扩展成局部地图记忆：加入遮挡、错误探测、不可重置探测成本、探索路径规划和多目标任务。
 30. 如果要继续验证 KV 剪枝，需要选定一个可控推理服务栈，确认是否暴露 prefix/segment 级 KV 生命周期 API。
 31. 若要验证潜空间训练路线，应单独建训练实验，不要把未验证训练假设混入现有 work-tree runtime。
+32. Stage AI 之后，不要继续在低熵单物体模板上加 seed 或拉长训练；它已经饱和。图像生成/编辑验证应直接切到 Stage AJ 这类“整图输入、prompt 不可见背景、latent 完整重绘”的保真任务。
+33. Stage AJ 之后，图像输出路线可以继续用 Transformer patch decoder；`memory_tree_supervised_copy` 已经把 copy-only 正式规模跑稳，edit/generation probe 也有强正信号。
+34. Stage AJ 之后，copy 重绘仍是编辑前置门禁：源图完整重绘必须先过 foreground scene exact，再测试 edit prompt 修改能力；不能只看背景 MSE 或全图 pixel MSE。
+35. 下一步应补完 supervised edit/generation 的正式长训，并把对象属性/mask 读头扩展为可修改对象表；不要直接把旧 `memory_tree_edit` 继续拉长训练。
+36. 可以小规模测试 patch size 4 是否改善对象边界，但必须和当前 supervised copy 对照，同时记录显存、吞吐和 foreground scene exact；不要把更高 token 成本误判为架构进步。
+37. 更长图像训练前应加 checkpoint、中间 PNG 样例和断点恢复；当前 Stage AI/AJ 脚本只适合快速 GPU 验证和 sweep 聚合。

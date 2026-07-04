@@ -91,6 +91,11 @@ class StageACConfig:
     reasoner_stage_replay_interval: int = 0
     moe_teacher_forcing: bool = False
     query_teacher_forcing: str = "none"
+    query_alignment_weight: float = 0.0
+    query_alignment_mode: str = "none"
+    query_alignment_detach_keys: bool = False
+    process_supervision_weight: float = 0.0
+    contrastive_temperature: float = 0.07
     modes: tuple[str, ...] = ("latent_reasoner",)
     families: tuple[str, ...] = FAMILIES
     evidence_latent_mode: str = "abstract"
@@ -127,6 +132,12 @@ class StageACSet:
     target_left_pair: torch.Tensor
     target_right_pair: torch.Tensor
     target_relation_op: torch.Tensor
+    target_left_row: torch.Tensor
+    target_left_col: torch.Tensor
+    target_right_row: torch.Tensor
+    target_right_col: torch.Tensor
+    target_delta_row: torch.Tensor
+    target_delta_col: torch.Tensor
     examples: list[dict[str, object]]
 
     def subset(self, indices: list[int]) -> "StageACSet":
@@ -152,6 +163,12 @@ class StageACSet:
             target_left_pair=self.target_left_pair[indices],
             target_right_pair=self.target_right_pair[indices],
             target_relation_op=self.target_relation_op[indices],
+            target_left_row=self.target_left_row[indices],
+            target_left_col=self.target_left_col[indices],
+            target_right_row=self.target_right_row[indices],
+            target_right_col=self.target_right_col[indices],
+            target_delta_row=self.target_delta_row[indices],
+            target_delta_col=self.target_delta_col[indices],
             examples=[self.examples[index] for index in indices],
         )
 
@@ -178,6 +195,12 @@ class StageACSet:
             target_left_pair=self.target_left_pair.to(device=device, dtype=torch.long),
             target_right_pair=self.target_right_pair.to(device=device, dtype=torch.long),
             target_relation_op=self.target_relation_op.to(device=device, dtype=torch.long),
+            target_left_row=self.target_left_row.to(device=device, dtype=torch.long),
+            target_left_col=self.target_left_col.to(device=device, dtype=torch.long),
+            target_right_row=self.target_right_row.to(device=device, dtype=torch.long),
+            target_right_col=self.target_right_col.to(device=device, dtype=torch.long),
+            target_delta_row=self.target_delta_row.to(device=device, dtype=torch.long),
+            target_delta_col=self.target_delta_col.to(device=device, dtype=torch.long),
             examples=self.examples,
         )
 
@@ -294,6 +317,12 @@ def empty_trace() -> dict[str, int]:
         "target_left_pair": -100,
         "target_right_pair": -100,
         "target_relation_op": -100,
+        "target_left_row": -100,
+        "target_left_col": -100,
+        "target_right_row": -100,
+        "target_right_col": -100,
+        "target_delta_row": -100,
+        "target_delta_col": -100,
     }
 
 
@@ -368,6 +397,12 @@ def make_example(rng: random.Random, family: str, config: StageACConfig) -> tupl
         trace["target_left_pair"] = left.color * len(SHAPES) + left.shape
         trace["target_right_pair"] = right.color * len(SHAPES) + right.shape
         trace["target_relation_op"] = RELATIONS.index(relation)
+        trace["target_left_row"] = left.row
+        trace["target_left_col"] = left.col
+        trace["target_right_row"] = right.row
+        trace["target_right_col"] = right.col
+        trace["target_delta_row"] = left.row - right.row + config.grid_size - 1
+        trace["target_delta_col"] = left.col - right.col + config.grid_size - 1
         return prompt, ["yes" if trace["target_relation"] else "no"], objects, trace
     raise ValueError(family)
 
@@ -396,6 +431,12 @@ def build_dataset(split: str, size: int, config: StageACConfig) -> StageACSet:
     target_left_pairs: list[int] = []
     target_right_pairs: list[int] = []
     target_relation_ops: list[int] = []
+    target_left_rows: list[int] = []
+    target_left_cols: list[int] = []
+    target_right_rows: list[int] = []
+    target_right_cols: list[int] = []
+    target_delta_rows: list[int] = []
+    target_delta_cols: list[int] = []
     examples: list[dict[str, object]] = []
     selected_families = tuple(config.families)
     for family in selected_families:
@@ -428,6 +469,12 @@ def build_dataset(split: str, size: int, config: StageACConfig) -> StageACSet:
         target_left_pairs.append(trace["target_left_pair"])
         target_right_pairs.append(trace["target_right_pair"])
         target_relation_ops.append(trace["target_relation_op"])
+        target_left_rows.append(trace["target_left_row"])
+        target_left_cols.append(trace["target_left_col"])
+        target_right_rows.append(trace["target_right_row"])
+        target_right_cols.append(trace["target_right_col"])
+        target_delta_rows.append(trace["target_delta_row"])
+        target_delta_cols.append(trace["target_delta_col"])
         examples.append(
             {
                 "split": split,
@@ -461,6 +508,12 @@ def build_dataset(split: str, size: int, config: StageACConfig) -> StageACSet:
         target_left_pair=torch.tensor(target_left_pairs, dtype=torch.long),
         target_right_pair=torch.tensor(target_right_pairs, dtype=torch.long),
         target_relation_op=torch.tensor(target_relation_ops, dtype=torch.long),
+        target_left_row=torch.tensor(target_left_rows, dtype=torch.long),
+        target_left_col=torch.tensor(target_left_cols, dtype=torch.long),
+        target_right_row=torch.tensor(target_right_rows, dtype=torch.long),
+        target_right_col=torch.tensor(target_right_cols, dtype=torch.long),
+        target_delta_row=torch.tensor(target_delta_rows, dtype=torch.long),
+        target_delta_col=torch.tensor(target_delta_cols, dtype=torch.long),
         examples=examples,
     )
 
@@ -657,6 +710,9 @@ class LatentReasoner(nn.Module):
     def __init__(self, config: StageACConfig) -> None:
         super().__init__()
         self.variant = config.reasoner_variant
+        self.query_alignment_mode = config.query_alignment_mode
+        self.query_alignment_detach_keys = config.query_alignment_detach_keys
+        self.contrastive_temperature = config.contrastive_temperature
         self.grid_cell_count = config.grid_size * config.grid_size
         self.answer_len = config.answer_len
         self.query = nn.Parameter(torch.randn(config.answer_len, config.d_model) * 0.02)
@@ -730,6 +786,11 @@ class LatentReasoner(nn.Module):
             nn.GELU(),
             nn.Linear(config.d_model * 2, config.d_model),
         )
+        self.pair_key_proj = nn.Linear(config.d_model, config.d_model)
+        self.left_query_proj = nn.Linear(config.d_model, config.d_model)
+        self.right_query_proj = nn.Linear(config.d_model, config.d_model)
+        self.delta_row_head = nn.Linear(config.d_model, config.grid_size * 2 - 1)
+        self.delta_col_head = nn.Linear(config.d_model, config.grid_size * 2 - 1)
         self.trace_answer_result = nn.Sequential(
             nn.Linear(config.d_model * 4, config.d_model * 2),
             nn.GELU(),
@@ -896,6 +957,11 @@ class LatentReasoner(nn.Module):
                 weights = torch.where(valid.unsqueeze(-1), forced, weights)
         return torch.bmm(weights.unsqueeze(1), tokens).squeeze(1)
 
+    def retrieval_logits(self, query: torch.Tensor, keys: torch.Tensor) -> torch.Tensor:
+        query_norm = F.normalize(query, dim=-1)
+        key_norm = F.normalize(keys, dim=-1)
+        return torch.bmm(key_norm, query_norm.unsqueeze(-1)).squeeze(-1) / self.contrastive_temperature
+
     def selected_weights(
         self,
         logits: torch.Tensor,
@@ -929,6 +995,11 @@ class LatentReasoner(nn.Module):
         count_pair_logits = self.count_pair_head(question_token)
         left_pair_logits = self.left_pair_head(question_token)
         relation_op_logits = self.relation_op_head(question_token)
+        pair_keys = self.pair_key_proj(pair_tokens)
+        retrieval_pair_keys = pair_keys.detach() if self.query_alignment_detach_keys else pair_keys
+        left_retrieval_logits = self.retrieval_logits(self.left_query_proj(question_token), retrieval_pair_keys)
+        if self.query_alignment_mode == "logits":
+            left_pair_logits = left_retrieval_logits
 
         cell_target = batch.target_cell if batch is not None else None
         count_target = batch.target_count_pair if batch is not None else None
@@ -943,6 +1014,9 @@ class LatentReasoner(nn.Module):
         left_observation = torch.bmm(left_weights.unsqueeze(1), pair_tokens).squeeze(1)
         left_state = self.trace_left_state(torch.cat((question_token, left_observation), dim=-1))
         right_pair_logits = self.right_pair_head(left_state)
+        right_retrieval_logits = self.retrieval_logits(self.right_query_proj(left_state), retrieval_pair_keys)
+        if self.query_alignment_mode == "logits":
+            right_pair_logits = right_retrieval_logits
         right_weights = self.selected_weights(right_pair_logits, right_target, teacher_force=teacher_force_queries)
         right_observation = torch.bmm(right_weights.unsqueeze(1), pair_tokens).squeeze(1)
         right_state = self.trace_right_state(torch.cat((question_token, left_state, right_observation), dim=-1))
@@ -969,6 +1043,8 @@ class LatentReasoner(nn.Module):
             torch.cat((question_token, left_state, right_state, relation_op_token), dim=-1)
         )
         relation_state = self.answer_token_norm(relation_state + position_compare)
+        delta_row_logits = self.delta_row_head(relation_state)
+        delta_col_logits = self.delta_col_head(relation_state)
 
         result_context = torch.cat((question_token, cell_observation, count_observation, relation_state), dim=-1)
         result_update = self.trace_answer_result(result_context)
@@ -984,7 +1060,15 @@ class LatentReasoner(nn.Module):
             "relation": self.relation_head(relation_state),
             "left_pair": left_pair_logits,
             "right_pair": right_pair_logits,
+            "left_pair_retrieval": left_retrieval_logits,
+            "right_pair_retrieval": right_retrieval_logits,
             "relation_op": relation_op_logits,
+            "left_row": left_row,
+            "left_col": left_col,
+            "right_row": right_row,
+            "right_col": right_col,
+            "delta_row": delta_row_logits,
+            "delta_col": delta_col_logits,
             "grid_occupied": self.occupancy_head(cell_tokens).squeeze(-1),
             "grid_color": self.color_head(cell_tokens),
             "grid_shape": self.shape_head(cell_tokens),
@@ -1163,6 +1247,30 @@ def trace_supervision_loss(logits: dict[str, torch.Tensor], batch: StageACSet) -
     return total, metrics
 
 
+def query_alignment_loss(logits: dict[str, torch.Tensor], batch: StageACSet) -> tuple[torch.Tensor, dict[str, float]]:
+    losses = {
+        "left_pair_retrieval": optional_named_ce(logits, "left_pair_retrieval", batch.target_left_pair),
+        "right_pair_retrieval": optional_named_ce(logits, "right_pair_retrieval", batch.target_right_pair),
+    }
+    total = sum(losses.values())
+    metrics = {f"query_alignment_loss_{name}": float(value.detach().cpu()) for name, value in losses.items()}
+    return total, metrics
+
+
+def process_supervision_loss(logits: dict[str, torch.Tensor], batch: StageACSet) -> tuple[torch.Tensor, dict[str, float]]:
+    losses = {
+        "left_row": optional_named_ce(logits, "left_row", batch.target_left_row),
+        "left_col": optional_named_ce(logits, "left_col", batch.target_left_col),
+        "right_row": optional_named_ce(logits, "right_row", batch.target_right_row),
+        "right_col": optional_named_ce(logits, "right_col", batch.target_right_col),
+        "delta_row": optional_named_ce(logits, "delta_row", batch.target_delta_row),
+        "delta_col": optional_named_ce(logits, "delta_col", batch.target_delta_col),
+    }
+    total = sum(losses.values())
+    metrics = {f"process_loss_{name}": float(value.detach().cpu()) for name, value in losses.items()}
+    return total, metrics
+
+
 def reasoner_reader_loss(logits: dict[str, torch.Tensor], batch: StageACSet) -> tuple[torch.Tensor, dict[str, float]]:
     if "grid_occupied" not in logits:
         zero = logits["operation"].sum() * 0.0
@@ -1231,7 +1339,19 @@ def trace_metrics(logits: dict[str, torch.Tensor], batch: StageACSet) -> dict[st
         "trace_relation_accuracy": optional_accuracy(logits["relation"], batch.target_relation),
         "trace_left_pair_accuracy": optional_named_accuracy(logits, "left_pair", batch.target_left_pair),
         "trace_right_pair_accuracy": optional_named_accuracy(logits, "right_pair", batch.target_right_pair),
+        "trace_left_pair_retrieval_accuracy": optional_named_accuracy(
+            logits, "left_pair_retrieval", batch.target_left_pair
+        ),
+        "trace_right_pair_retrieval_accuracy": optional_named_accuracy(
+            logits, "right_pair_retrieval", batch.target_right_pair
+        ),
         "trace_relation_op_accuracy": optional_named_accuracy(logits, "relation_op", batch.target_relation_op),
+        "trace_left_row_accuracy": optional_named_accuracy(logits, "left_row", batch.target_left_row),
+        "trace_left_col_accuracy": optional_named_accuracy(logits, "left_col", batch.target_left_col),
+        "trace_right_row_accuracy": optional_named_accuracy(logits, "right_row", batch.target_right_row),
+        "trace_right_col_accuracy": optional_named_accuracy(logits, "right_col", batch.target_right_col),
+        "trace_delta_row_accuracy": optional_named_accuracy(logits, "delta_row", batch.target_delta_row),
+        "trace_delta_col_accuracy": optional_named_accuracy(logits, "delta_col", batch.target_delta_col),
     }
     result = {key: value for key, value in raw.items() if value is not None}
     if "moe_gate" in logits:
@@ -1456,9 +1576,13 @@ def train_reasoner(
         logits = text_codec.decode_answer(predicted_answer_latent)
         trace_loss, trace_loss_metrics = trace_supervision_loss(trace_logits, batch)
         reader_loss, reader_loss_metrics = reasoner_reader_loss(trace_logits, batch)
+        alignment_loss, alignment_loss_metrics = query_alignment_loss(trace_logits, batch)
+        process_loss, process_loss_metrics = process_supervision_loss(trace_logits, batch)
         loss = sequence_loss(logits, batch.answers) + config.latent_mse_weight * F.mse_loss(
             predicted_answer_latent, target_answer_latent
         ) + config.reasoner_trace_weight * trace_loss + config.reasoner_reader_weight * reader_loss
+        loss = loss + config.query_alignment_weight * alignment_loss
+        loss = loss + config.process_supervision_weight * process_loss
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
@@ -1470,6 +1594,8 @@ def train_reasoner(
                 metrics["stage_family"] = active_stage_family
             metrics.update(trace_loss_metrics)
             metrics.update(reader_loss_metrics)
+            metrics.update(alignment_loss_metrics)
+            metrics.update(process_loss_metrics)
             history.append(metrics)
     return {"history": history, "final": evaluate_reasoner(text_codec, evidence_codec, reasoner, val, config, device)}
 
@@ -1580,7 +1706,19 @@ def aggregate_runs(runs: list[dict[str, object]]) -> dict[str, object]:
         "latent_reasoner_trace_relation_accuracy": mean("test.latent_reasoner.full.trace_relation_accuracy"),
         "latent_reasoner_trace_left_pair_accuracy": mean("test.latent_reasoner.full.trace_left_pair_accuracy"),
         "latent_reasoner_trace_right_pair_accuracy": mean("test.latent_reasoner.full.trace_right_pair_accuracy"),
+        "latent_reasoner_trace_left_pair_retrieval_accuracy": mean(
+            "test.latent_reasoner.full.trace_left_pair_retrieval_accuracy"
+        ),
+        "latent_reasoner_trace_right_pair_retrieval_accuracy": mean(
+            "test.latent_reasoner.full.trace_right_pair_retrieval_accuracy"
+        ),
         "latent_reasoner_trace_relation_op_accuracy": mean("test.latent_reasoner.full.trace_relation_op_accuracy"),
+        "latent_reasoner_trace_left_row_accuracy": mean("test.latent_reasoner.full.trace_left_row_accuracy"),
+        "latent_reasoner_trace_left_col_accuracy": mean("test.latent_reasoner.full.trace_left_col_accuracy"),
+        "latent_reasoner_trace_right_row_accuracy": mean("test.latent_reasoner.full.trace_right_row_accuracy"),
+        "latent_reasoner_trace_right_col_accuracy": mean("test.latent_reasoner.full.trace_right_col_accuracy"),
+        "latent_reasoner_trace_delta_row_accuracy": mean("test.latent_reasoner.full.trace_delta_row_accuracy"),
+        "latent_reasoner_trace_delta_col_accuracy": mean("test.latent_reasoner.full.trace_delta_col_accuracy"),
         "latent_reasoner_reader_occupancy_exact": mean("test.latent_reasoner.full.reader_grid_occupancy_exact"),
         "latent_reasoner_reader_color_accuracy": mean("test.latent_reasoner.full.reader_occupied_color_accuracy"),
         "latent_reasoner_reader_shape_accuracy": mean("test.latent_reasoner.full.reader_occupied_shape_accuracy"),
@@ -1629,6 +1767,15 @@ def main() -> None:
     parser.add_argument("--latent-mse-weight", type=float, default=StageACConfig.latent_mse_weight)
     parser.add_argument("--reasoner-trace-weight", type=float, default=StageACConfig.reasoner_trace_weight)
     parser.add_argument("--reasoner-reader-weight", type=float, default=StageACConfig.reasoner_reader_weight)
+    parser.add_argument("--query-alignment-weight", type=float, default=StageACConfig.query_alignment_weight)
+    parser.add_argument(
+        "--query-alignment-mode",
+        choices=("none", "logits"),
+        default=StageACConfig.query_alignment_mode,
+    )
+    parser.add_argument("--query-alignment-detach-keys", action="store_true")
+    parser.add_argument("--process-supervision-weight", type=float, default=StageACConfig.process_supervision_weight)
+    parser.add_argument("--contrastive-temperature", type=float, default=StageACConfig.contrastive_temperature)
     parser.add_argument(
         "--reasoner-variant",
         choices=("plain", "readout", "active_read", "trace_multistep", "moe_active"),
@@ -1672,6 +1819,11 @@ def main() -> None:
             latent_mse_weight=args.latent_mse_weight,
             reasoner_trace_weight=args.reasoner_trace_weight,
             reasoner_reader_weight=args.reasoner_reader_weight,
+            query_alignment_weight=args.query_alignment_weight,
+            query_alignment_mode=args.query_alignment_mode,
+            query_alignment_detach_keys=args.query_alignment_detach_keys,
+            process_supervision_weight=args.process_supervision_weight,
+            contrastive_temperature=args.contrastive_temperature,
             reasoner_variant=args.reasoner_variant,
             reasoner_training_mode=args.reasoner_training_mode,
             reasoner_stage_order=parse_csv_strings(args.reasoner_stage_order),
