@@ -10,6 +10,7 @@
 | 路径 | 用途 |
 | --- | --- |
 | `README.md` | 项目简短介绍、近期图像生成/编辑成果、Stage E+F 多模态融合成功结果、目标路线、初步证明和最小验证入口 |
+| `docs/experiment-general-lessons.md` | 当前实验按任务线沉淀出的失败、修复和通用规则，覆盖统一 latent bus、专家分工、输出头、图像保真、长训恢复和旧路线收口 |
 | `docs/from-scratch-training-vram-quantization.md` | 从 0 训练完整架构验证的显存、量化、省显存边界和最低价整机购卡建议 |
 | `pyproject.toml` | Python 测试配置、pytest 可选依赖、DocVQA 数据读取可选依赖与预训练/LLaVA 实验依赖 |
 | `.gitignore` | 忽略本地虚拟环境、pytest 缓存、大模型 checkpoint 和本地 HF token 文件 |
@@ -48,10 +49,12 @@
 | `experiments/omni_transformer_stage_ab_text_moe_alignment.py` | Stage AB 文本 latent 对齐、latent-to-answer 输出专家和 MoE 推理实验：对齐 prompt/answer latent、候选答案 latent scorer 与 routed reasoner |
 | `experiments/omni_transformer_stage_ac_latent_reasoning.py` | Stage AC/AD/AE/AF/AG/AH Q/A 潜空间、外部信息互译与答案 token 潜空间推理实验：分阶段训练 text codec、evidence codec、latent reasoner，并支持 reasoner-only readout/trace、active-read agent、MoE staged、teacher-forced multi-step query trace、query alignment/process supervision 消融与 no/shuffled evidence 门禁 |
 | `experiments/omni_transformer_stage_ai_image_generation_editing.py` | Stage AI 图像生成与源图编辑输出专家实验：prompt direct、latent output、latent image edit、no-source/source-no-edit 消融与 36 小时时间上限 |
-| `experiments/omni_transformer_stage_aj_transformer_image_io_fidelity.py` | Stage AJ Transformer 图像输入到 latent 再完整重绘保真实验：patch-token image encoder、fixed latent baseline、记忆树式逐层残差 latent、copy/edit/generation 对象属性/mask 辅助监督、Transformer patch decoder、no-source 消融、批量 GPU template parser 与前景/背景分解指标 |
-| `experiments/omni_transformer_stage_ak_unified_latent_bus.py` | Stage AK/AL/AM 统一潜空间硬化实验：pair/object、cell、count latent bus，text query retrieval、decoded position compare、answer writer、no-evidence 门禁与 AMP/GPU 常驻训练 |
+| `experiments/omni_transformer_stage_aj_transformer_image_io_fidelity.py` | Stage AJ Transformer 图像输入到 latent 再完整重绘保真实验：patch-token image encoder、fixed latent baseline、记忆树式逐层残差 latent、copy/edit/generation 对象属性/mask 辅助监督、Transformer patch decoder、no-source 消融、批量 GPU template parser、前景/背景分解指标、P0 checkpoint/resume 长训恢复 |
+| `experiments/omni_transformer_stage_ak_unified_latent_bus.py` | Stage AK/AL/AM/AN/AQ 统一潜空间硬化实验：pair/object、cell、count latent bus，text query retrieval、decoded position compare、分类 answer writer、answer-token writer、relation delta/truth-table 过程监督、no-evidence 门禁与 AMP/GPU 常驻训练 |
+| `experiments/omni_transformer_stage_ao_pixel_to_slots.py` | Stage AO 像素到 cell/count/pair slots 训练前准备实验：合成像素图、pixel cell expert、soft count slots、复用统一 bus/answer-token/relation process、zero-image 门禁与 sweep 聚合 |
 | `src/latent_space_agent_feasibility/` | 纯 Python 原型，实现 LOD、注意力泵、主动采样、记忆树节点/关联边、KV 分支剪枝、离线对齐与渐进式生成计划 |
 | `tests/` | 可运行验证用例，覆盖白皮书核心命题的接口和不变量 |
+| `tests/test_stage_aj_checkpointing.py` | Stage AJ P0 checkpoint/resume 辅助逻辑测试，覆盖 runtime 控制参数兼容和显式 CPU 设备选择 |
 | `artifacts/text_to_latent_thought/results.json` | 训练实验结果；运行脚本后生成，不保存模型 checkpoint |
 | `artifacts/text_to_latent_thought/sweep_results.json` | move=6/8/10、3 seeds 的聚合结果 |
 | `artifacts/text_to_latent_thought/sweep_runs/` | sweep 的每次 run 明细 JSON |
@@ -202,6 +205,21 @@
 | `artifacts/omni_transformer_stage_am_hardest_unified_bus/position_compare_all_task_runs/` | Stage AM 最终 all-task 每次 run 明细 JSON |
 | `artifacts/omni_transformer_stage_am_hardest_unified_bus/*_smoke_results.json` | Stage AM 各结构改动 smoke 结果，用于验证 count slot、count 输入专家和 position compare 的 JSON 输出链路 |
 | `artifacts/omni_transformer_stage_am_hardest_unified_bus/*_all_task_results.json` | Stage AM 失败/对照 all-task 聚合结果，用于比较 pair-head count、softmax count、additive count、compare 权重和 position compare |
+| `artifacts/omni_transformer_stage_an_answer_token_writer/smoke_results.json` | Stage AN answer-token writer smoke 聚合结果，用于验证 token writer 训练、sequence exact 指标和聚合 JSON 输出链路 |
+| `artifacts/omni_transformer_stage_an_answer_token_writer/smoke_runs/` | Stage AN smoke 每次 run 明细 JSON |
+| `artifacts/omni_transformer_stage_an_answer_token_writer/formal_results.json` | Stage AN 正式 3 seed 训练聚合结果；answer-token sequence exact 98.11%，relation sequence exact 92.45%，no-evidence sequence exact 27.93% |
+| `artifacts/omni_transformer_stage_an_answer_token_writer/formal_runs/` | Stage AN 正式训练每次 seed 明细 JSON，包含训练轨迹、full/no-evidence 指标和耗时 |
+| `artifacts/omni_transformer_stage_aq_relation_process_supervision/formal_results.json` | Stage AQ v1 正式 3 seed 失败结果；learned truth-table 未稳，relation sequence exact 89.32% |
+| `artifacts/omni_transformer_stage_aq_relation_process_supervision/formal_results_v2.json` | Stage AQ v2 正式 3 seed 中间结果；deterministic truth-table 已可读但弱注入不足，relation sequence exact 96.61% |
+| `artifacts/omni_transformer_stage_aq_relation_process_supervision/formal_results_v3.json` | Stage AQ v3 正式 3 seed 通过结果；truth-table 强注入后 relation sequence exact 99.74%，truth-table 100%，no-evidence truth-table 50.52% |
+| `artifacts/omni_transformer_stage_aq_relation_process_supervision/formal_runs_v3/` | Stage AQ v3 每个 seed 明细 JSON，包含 delta、truth-table、answer-token 与 no-evidence 指标 |
+| `artifacts/omni_transformer_stage_aq_relation_process_supervision/smoke_results*.json` | Stage AQ 各版本 smoke 结果，用于验证过程监督字段、truth-table 计算和聚合 JSON 输出链路 |
+| `artifacts/omni_transformer_stage_ao_pixel_to_slots/smoke_results.json` | Stage AO 像素到 slots 2-step smoke 聚合结果，用于验证训练循环、zero-image 消融和 JSON 输出链路 |
+| `artifacts/omni_transformer_stage_ao_pixel_to_slots/smoke_runs/` | Stage AO smoke 每次 seed 明细 JSON |
+| `artifacts/omni_transformer_stage_ao_pixel_to_slots/probe_results.json` | Stage AO 80-step 单 seed 短 probe 聚合结果；颜色/形状与 cell slots 有学习信号，但 count table 仍弱 |
+| `artifacts/omni_transformer_stage_ao_pixel_to_slots/probe_runs/` | Stage AO 短 probe 每次 seed 明细 JSON |
+| `artifacts/omni_transformer_stage_ao_pixel_to_slots/formal_results.json` | Stage AO 正式 3 seed 聚合结果；cell/color/shape、learned count table、count answer 和全任务 answer 闭合，pixel soft count 诊断 81.45% 未过 95% |
+| `artifacts/omni_transformer_stage_ao_pixel_to_slots/formal_runs/` | Stage AO 正式训练每个 seed 明细 JSON，包含 full/no-image 指标、训练轨迹和耗时 |
 | `artifacts/omni_transformer_stage_ai_image_generation_editing/result.json` | Stage AI 单 seed GPU 图像生成/编辑早期结果，保留为正式 sweep 前的参考 |
 | `artifacts/omni_transformer_stage_ai_image_generation_editing/smoke_result.json` | Stage AI 小规模 smoke 结果，用于快速验证脚本、GPU、JSON 和 PNG 输出链路 |
 | `artifacts/omni_transformer_stage_ai_image_generation_editing/samples/result/` | Stage AI 正式单 seed 的源图、目标图、prompt direct、latent output、latent image edit 和 no-source PNG 样例 |
@@ -226,8 +244,16 @@
 | `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/samples/supervised_edit_generate_probe_result/` | Stage AJ 监督 edit/generation probe 的随机背景 edit、no-source 和规范背景 generation PNG 样例 |
 | `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/formal_memory_tree_result.json` | Stage AJ 单 seed memory-tree 正式长训结果；edit scene exact 11.91%、no-source 3.71%、copy 0.59%，说明编辑信号增强但完整重绘保真失败 |
 | `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/samples/formal_memory_tree_result/` | Stage AJ memory-tree 正式长训 PNG 样例，含 background/source/target、copy/edit/no-source 输出 |
+| `artifacts/omni_transformer_stage_ap_formal_edit_generate/formal_edit_generate_result.json` | Stage AP 正式单 seed edit/generation 长训结果；edit scene exact 99.02%、edit no-source 4.10%、text generation 100% |
+| `artifacts/omni_transformer_stage_ap_formal_edit_generate/checkpoints/` | Stage AP 正式长训 latest/best checkpoint、step 级样例 PNG/JSON 和恢复续跑状态 |
+| `artifacts/omni_transformer_stage_ap_formal_edit_generate/samples/formal_edit_generate_result/` | Stage AP 正式结果样例 PNG，含 source、target、edit、edit_no_source 和 generate 输出 |
+| `artifacts/p0_stage_aj_checkpoint_resume_smoke/partial_result.json` | Stage AJ P0 interrupted smoke 结果，使用 `--stop-after-steps 2` 验证 step 2 停止和 checkpoint 落盘 |
+| `artifacts/p0_stage_aj_checkpoint_resume_smoke/resumed_result.json` | Stage AJ P0 resume smoke 结果，使用 `--resume` 从 step 2 续到 step 4 |
+| `artifacts/p0_stage_aj_checkpoint_resume_smoke/uninterrupted_result.json` | Stage AJ P0 uninterrupted 对照结果，用于比较 resume 与不中断训练的关键指标差异 |
+| `artifacts/p0_stage_aj_checkpoint_resume_smoke/resume_checkpoints/` | Stage AJ P0 resume smoke 的 latest/best checkpoint 和 step 级样例 PNG/JSON |
 | `docs/feasibility-report.md` | 中文可行性结论、关联项目概念映射、截至 Stage AM 的全部实验结论和未证明边界 |
 | `docs/next-stage-test-plan.md` | 下一阶段测试任务规划，定义 P0-P3 挑战矩阵、Stage AN/AO/AP/AQ 等任务、通过门槛、旧路线收口规则和担忧 |
+| `docs/experiment-general-lessons.md` | 从当前全部实验中按任务线抽取的失败、修复和跨任务通用规则，只保留后续所有任务都应遵守的原则和担忧 |
 | `docs/from-scratch-training-vram-quantization.md` | 从 0 训练完整架构验证的显存档位、量化收益、无效量化、购卡优先级和正式验证下限 |
 | `docs/text-to-latent-thought-experiment.md` | 纯文本思考训练迁移到特殊 latent token 内部思考的本机 GPU 实验报告 |
 | `docs/heterogeneous-latent-input-experiment.md` | 文本动作 + 非文本地形 tensor 的异构输入潜变量实验报告，说明可行性证据与非优劣对照边界 |
@@ -265,10 +291,14 @@
 | `docs/omni-transformer-stage-ag-teacher-forced-query-trace-experiment.md` | Stage AG teacher-forced multi-step query trace 报告，说明正确读取后的上限、自由 query 瓶颈和 relation compare 负结果 |
 | `docs/omni-transformer-stage-ah-query-process-ablation-experiment.md` | Stage AH query alignment 与 process supervision 逐项消融报告，说明各自修复的问题与副作用 |
 | `docs/omni-transformer-stage-ai-image-generation-editing-experiment.md` | Stage AI 图像生成与源图编辑输出专家报告，说明正式 sweep 饱和、消融有效和真实图像外推边界 |
-| `docs/omni-transformer-stage-aj-transformer-image-io-fidelity-experiment.md` | Stage AJ Transformer 图像输入到 latent 再完整重绘保真报告，说明 fixed baseline 负结果、memory-tree 正式长训信号、copy 门禁失败、copy/edit/generation 辅助监督正信号和下一步对象保真门禁 |
+| `docs/omni-transformer-stage-aj-transformer-image-io-fidelity-experiment.md` | Stage AJ Transformer 图像输入到 latent 再完整重绘保真报告，说明 fixed baseline 负结果、memory-tree 正式长训信号、copy 门禁失败、copy/edit/generation 辅助监督正信号、P0 checkpoint/resume 恢复验证和下一步对象保真门禁 |
+| `docs/omni-transformer-stage-ap-formal-edit-generation-experiment.md` | Stage AP 正式 edit/generation 长训报告，说明 d_model 192 正式单 seed 下 edit/generation 闭合、no-source 消融和边界 |
 | `docs/omni-transformer-stage-ak-unified-latent-bus-experiment.md` | Stage AK 统一潜空间硬化报告，说明统一 object/pair bus 如何闭合 query retrieval 与 relation compare |
 | `docs/omni-transformer-stage-al-unified-bus-answer-experiment.md` | Stage AL 统一潜空间接答案输出头报告，说明硬 latent bus 到 yes/no answer writer 的最小链路闭合 |
 | `docs/omni-transformer-stage-am-hardest-unified-bus-experiment.md` | Stage AM 历史最高难度统一 bus 报告，说明 cell/count slots 一等化、count 输入专家和 decoded position compare 如何闭合四任务 |
+| `docs/omni-transformer-stage-an-answer-token-latent-writer-prep.md` | Stage AN 统一 bus 接 answer-token latent writer 的训练前准备、正式命令、正式 3 seed 结果、门禁判断和担忧 |
+| `docs/omni-transformer-stage-ao-pixel-to-slots-prep.md` | Stage AO 像素到 cell/count/pair slots 的训练前准备、smoke/probe、正式 3 seed 结果、pixel count 诊断未过门槛和担忧 |
+| `docs/omni-transformer-stage-aq-relation-process-supervision-experiment.md` | Stage AQ relation delta/truth-table 过程监督报告，记录 v1/v2 失败与 v3 通过结果 |
 | `docs/archive/README-2026-07-04-legacy-command-list.md` | 2026-07-04 重写 README 前的旧版命令清单和逐阶段实验链接归档，仅作记录性查阅 |
 | `docs/DIRECTORY_REFERENCE.md` | 当前文件，保持测试工作区结构可检索 |
 
@@ -312,6 +342,7 @@
 |   |-- omni_transformer_stage_ai_image_generation_editing.py
 |   |-- omni_transformer_stage_aj_transformer_image_io_fidelity.py
 |   |-- omni_transformer_stage_ak_unified_latent_bus.py
+|   |-- omni_transformer_stage_ao_pixel_to_slots.py
 |   |-- text_to_latent_sweep.py
 |   |-- text_to_latent_thought.py
 |   |-- visual_multimodal_stage_ab.py
@@ -321,6 +352,7 @@
 |   |-- archive/
 |   |   `-- README-2026-07-04-legacy-command-list.md
 |   |-- DIRECTORY_REFERENCE.md
+|   |-- experiment-general-lessons.md
 |   |-- feasibility-report.md
 |   |-- next-stage-test-plan.md
 |   |-- from-scratch-training-vram-quantization.md
@@ -359,9 +391,13 @@
 |   |-- omni-transformer-stage-ah-query-process-ablation-experiment.md
 |   |-- omni-transformer-stage-ai-image-generation-editing-experiment.md
 |   |-- omni-transformer-stage-aj-transformer-image-io-fidelity-experiment.md
+|   |-- omni-transformer-stage-ap-formal-edit-generation-experiment.md
 |   |-- omni-transformer-stage-ak-unified-latent-bus-experiment.md
 |   |-- omni-transformer-stage-al-unified-bus-answer-experiment.md
 |   |-- omni-transformer-stage-am-hardest-unified-bus-experiment.md
+|   |-- omni-transformer-stage-an-answer-token-latent-writer-prep.md
+|   |-- omni-transformer-stage-ao-pixel-to-slots-prep.md
+|   |-- omni-transformer-stage-aq-relation-process-supervision-experiment.md
 |   |-- text-to-latent-thought-experiment.md
 |   |-- visual-multimodal-stage-ab-experiment.md
 |   |-- visual-multimodal-stage-c-experiment.md
@@ -371,7 +407,8 @@
 |       |-- __init__.py
 |       `-- core.py
 `-- tests/
-    `-- test_architecture_feasibility.py
+    |-- test_architecture_feasibility.py
+    `-- test_stage_aj_checkpointing.py
 ```
 
 ## 快速查找
@@ -381,6 +418,7 @@
 | 项目简短介绍、近期图像生成/编辑成果、Stage E+F 多模态融合成功结果、目标路线和初步证明 | `README.md` |
 | 多模态潜空间架构是否可行 | `docs/feasibility-report.md` |
 | 下一阶段测试任务规划、挑战矩阵、通过门槛和旧路线收口规则 | `docs/next-stage-test-plan.md` |
+| 当前实验中按任务线沉淀的失败、修复和通用经验 | `docs/experiment-general-lessons.md` |
 | 从 0 训练完整架构验证至少需要多少显存、量化能省多少、最低价整机买什么显卡 | `docs/from-scratch-training-vram-quantization.md` |
 | 纯文本训练迁移到特殊 latent token 内部思考是否可行 | `experiments/text_to_latent_thought.py` 与 `artifacts/text_to_latent_thought/results.json` |
 | 多 seed / 更长 move 的稳定性 | `experiments/text_to_latent_sweep.py` 与 `artifacts/text_to_latent_thought/sweep_results.json` |
@@ -457,16 +495,21 @@
 | Stage AG 正确读取后的上限、自由 query 瓶颈和 relation compare 负结果 | `docs/omni-transformer-stage-ag-teacher-forced-query-trace-experiment.md` |
 | Stage AH query alignment 与 process supervision 逐项消融实验 | `experiments/omni_transformer_stage_ac_latent_reasoning.py` 与 `artifacts/omni_transformer_stage_ah_query_process_ablation/` |
 | Stage AH 各思路分别修复了哪些问题与带来哪些副作用 | `docs/omni-transformer-stage-ah-query-process-ablation-experiment.md` |
-| Stage AK/AL/AM 统一潜空间硬化实验 | `experiments/omni_transformer_stage_ak_unified_latent_bus.py` 与 `artifacts/omni_transformer_stage_ak_unified_latent_bus/`、`artifacts/omni_transformer_stage_al_unified_bus_answer/`、`artifacts/omni_transformer_stage_am_hardest_unified_bus/` |
+| Stage AK/AL/AM/AN/AQ 统一潜空间硬化实验 | `experiments/omni_transformer_stage_ak_unified_latent_bus.py` 与 `artifacts/omni_transformer_stage_ak_unified_latent_bus/`、`artifacts/omni_transformer_stage_al_unified_bus_answer/`、`artifacts/omni_transformer_stage_am_hardest_unified_bus/`、`artifacts/omni_transformer_stage_an_answer_token_writer/`、`artifacts/omni_transformer_stage_aq_relation_process_supervision/` |
 | Stage AK 先统一 object/pair latent bus 后 query 和 compare 同时闭合的结论 | `docs/omni-transformer-stage-ak-unified-latent-bus-experiment.md` |
 | Stage AL 统一潜空间接答案输出头实验 | `experiments/omni_transformer_stage_ak_unified_latent_bus.py` 与 `artifacts/omni_transformer_stage_al_unified_bus_answer/` |
 | Stage AL 硬 latent bus 到 yes/no answer writer 的最小输出链路 | `docs/omni-transformer-stage-al-unified-bus-answer-experiment.md` |
 | Stage AM 历史最高难度四任务统一 bus 实验 | `experiments/omni_transformer_stage_ak_unified_latent_bus.py` 与 `artifacts/omni_transformer_stage_am_hardest_unified_bus/` |
 | Stage AM cell/count slots 一等化、count 输入专家和 decoded position compare 结论 | `docs/omni-transformer-stage-am-hardest-unified-bus-experiment.md` |
+| Stage AN 统一 bus 接 answer-token writer 训练前准备、正式命令和 3 seed 结果 | `docs/omni-transformer-stage-an-answer-token-latent-writer-prep.md`、`experiments/omni_transformer_stage_ak_unified_latent_bus.py` 与 `artifacts/omni_transformer_stage_an_answer_token_writer/` |
+| Stage AO 像素到 cell/count/pair slots 训练前准备、smoke/probe、正式结果和 pixel count 诊断 | `docs/omni-transformer-stage-ao-pixel-to-slots-prep.md`、`experiments/omni_transformer_stage_ao_pixel_to_slots.py` 与 `artifacts/omni_transformer_stage_ao_pixel_to_slots/` |
+| Stage AQ relation delta/truth-table 过程监督实验、失败迭代和通过结果 | `docs/omni-transformer-stage-aq-relation-process-supervision-experiment.md`、`experiments/omni_transformer_stage_ak_unified_latent_bus.py` 与 `artifacts/omni_transformer_stage_aq_relation_process_supervision/` |
 | Stage AI 图像生成与源图编辑输出专家实验 | `experiments/omni_transformer_stage_ai_image_generation_editing.py` 与 `artifacts/omni_transformer_stage_ai_image_generation_editing/` |
 | Stage AI 低熵图像生成/编辑任务饱和与消融结论 | `docs/omni-transformer-stage-ai-image-generation-editing-experiment.md` |
 | Stage AJ Transformer 图像 IO 保真实验 | `experiments/omni_transformer_stage_aj_transformer_image_io_fidelity.py` 与 `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/` |
 | Stage AJ fixed baseline 负结果、memory-tree 正式长训、copy 门禁失败与 copy/edit/generation 辅助监督正信号 | `docs/omni-transformer-stage-aj-transformer-image-io-fidelity-experiment.md` |
+| Stage AJ P0 checkpoint/resume 长训恢复、step 样例和恢复等价 smoke | `experiments/omni_transformer_stage_aj_transformer_image_io_fidelity.py`、`tests/test_stage_aj_checkpointing.py` 与 `artifacts/p0_stage_aj_checkpoint_resume_smoke/` |
+| Stage AP 正式 edit/generation 长训、no-source 消融和样例 | `docs/omni-transformer-stage-ap-formal-edit-generation-experiment.md` 与 `artifacts/omni_transformer_stage_ap_formal_edit_generate/` |
 | 本轮 GPU 训练实验结论 | `docs/text-to-latent-thought-experiment.md` |
 | 如何运行验证 | `README.md` |
 | 旧 README 的逐阶段长命令清单 | `docs/archive/README-2026-07-04-legacy-command-list.md` |

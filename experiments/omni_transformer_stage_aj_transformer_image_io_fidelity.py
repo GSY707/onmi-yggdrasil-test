@@ -22,6 +22,19 @@ if str(SCRIPT_DIR) not in sys.path:
 from visual_multimodal_stage_ab import write_png
 
 
+CHECKPOINT_SCHEMA_VERSION = 1
+EXPERIMENT_NAME = "omni_transformer_stage_aj_transformer_image_io_fidelity"
+CHECKPOINT_IGNORED_CONFIG_KEYS = {
+    "checkpoint_every",
+    "checkpoint_sample_count",
+    "checkpoint_sample_every",
+    "copy_steps",
+    "edit_steps",
+    "generate_steps",
+    "max_train_seconds",
+    "variants",
+}
+
 COLORS = ("red", "green", "blue", "yellow", "purple", "cyan")
 RGB = (
     (0.92, 0.08, 0.08),
@@ -74,6 +87,9 @@ class StageAJConfig:
     train_eval_size: int = 128
     template_chunk_size: int = 30
     max_train_seconds: int = 129_600
+    checkpoint_every: int = 0
+    checkpoint_sample_every: int = 300
+    checkpoint_sample_count: int = 2
     variants: tuple[str, ...] = ("memory_tree_supervised_copy",)
 
 
@@ -1122,6 +1138,233 @@ def checkpoint_score(metrics: dict[str, object]) -> float:
     return foreground - scene
 
 
+def checkpoint_config_mismatches(saved_config: dict[str, object], config: StageAJConfig) -> dict[str, tuple[object, object]]:
+    current = asdict(config)
+    mismatches: dict[str, tuple[object, object]] = {}
+    for key, value in current.items():
+        if key in CHECKPOINT_IGNORED_CONFIG_KEYS:
+            continue
+        saved_value = saved_config.get(key)
+        if isinstance(saved_value, list) and isinstance(value, tuple):
+            saved_value = tuple(saved_value)
+        if saved_value != value:
+            mismatches[key] = (saved_value, value)
+    return mismatches
+
+
+def atomic_torch_save(payload: dict[str, object], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f"{path.name}.tmp")
+    torch.save(payload, tmp_path)
+    tmp_path.replace(path)
+
+
+def torch_load(path: Path, *, device: torch.device) -> dict[str, object]:
+    try:
+        loaded = torch.load(path, map_location=device, weights_only=False)
+    except TypeError:
+        loaded = torch.load(path, map_location=device)
+    if not isinstance(loaded, dict):
+        raise TypeError(f"checkpoint must contain a dict payload: {path}")
+    return loaded
+
+
+def optimizer_to_device(optimizer: torch.optim.Optimizer, device: torch.device) -> None:
+    for state in optimizer.state.values():
+        for key, value in list(state.items()):
+            if isinstance(value, torch.Tensor):
+                state[key] = value.to(device=device)
+
+
+def capture_torch_rng_state(device: torch.device) -> dict[str, object]:
+    return {
+        "cpu": torch.get_rng_state(),
+        "cuda_all": torch.cuda.get_rng_state_all() if device.type == "cuda" else [],
+    }
+
+
+def restore_torch_rng_state(state: object, device: torch.device) -> None:
+    if not isinstance(state, dict):
+        return
+    cpu_state = state.get("cpu")
+    if isinstance(cpu_state, torch.Tensor):
+        torch.set_rng_state(cpu_state.detach().cpu())
+    cuda_states = state.get("cuda_all")
+    if device.type == "cuda" and isinstance(cuda_states, list) and cuda_states:
+        torch.cuda.set_rng_state_all([item.detach().cpu() for item in cuda_states if isinstance(item, torch.Tensor)])
+
+
+def effective_checkpoint_every(config: StageAJConfig) -> int:
+    return max(1, config.checkpoint_every if config.checkpoint_every > 0 else config.eval_every)
+
+
+def load_training_checkpoint(
+    path: Path,
+    *,
+    model: nn.Module,
+    optimizer: torch.optim.Optimizer,
+    generator: torch.Generator,
+    config: StageAJConfig,
+    label: str,
+    task: str,
+    device: torch.device,
+) -> dict[str, object] | None:
+    if not path.exists():
+        return None
+    payload = torch_load(path, device=device)
+    if int(payload.get("schema_version", -1)) != CHECKPOINT_SCHEMA_VERSION:
+        raise ValueError(f"unsupported checkpoint schema in {path}: {payload.get('schema_version')}")
+    if payload.get("experiment") != EXPERIMENT_NAME:
+        raise ValueError(f"checkpoint experiment mismatch in {path}: {payload.get('experiment')}")
+    if payload.get("variant") != label or payload.get("task") != task:
+        raise ValueError(f"checkpoint variant/task mismatch in {path}: {payload.get('variant')} {payload.get('task')}")
+    mismatches = checkpoint_config_mismatches(payload.get("config", {}), config)  # type: ignore[arg-type]
+    if mismatches:
+        raise ValueError(f"checkpoint config mismatch in {path}: {mismatches}")
+
+    model_state = payload.get("model_state")
+    optimizer_state = payload.get("optimizer_state")
+    generator_state = payload.get("generator_state")
+    if not isinstance(model_state, dict) or not isinstance(optimizer_state, dict) or not isinstance(generator_state, torch.Tensor):
+        raise TypeError(f"checkpoint is missing train state tensors: {path}")
+    model.load_state_dict(model_state)
+    optimizer.load_state_dict(optimizer_state)
+    optimizer_to_device(optimizer, device)
+    generator.set_state(generator_state.detach().cpu())
+    restore_torch_rng_state(payload.get("torch_rng_state"), device)
+    return payload
+
+
+def save_training_checkpoint(
+    path: Path,
+    *,
+    model: nn.Module,
+    optimizer: torch.optim.Optimizer,
+    generator: torch.Generator,
+    config: StageAJConfig,
+    label: str,
+    task: str,
+    step: int,
+    steps_requested: int,
+    history: list[dict[str, object]],
+    best_score: float,
+    best_step: int,
+    best_state: dict[str, torch.Tensor] | None,
+    started: float,
+    device: torch.device,
+    completed: bool,
+    stopped_by_time_budget: bool,
+    stopped_by_step_limit: bool,
+) -> None:
+    payload: dict[str, object] = {
+        "schema_version": CHECKPOINT_SCHEMA_VERSION,
+        "experiment": EXPERIMENT_NAME,
+        "variant": label,
+        "task": task,
+        "config": asdict(config),
+        "step": step,
+        "steps_requested": steps_requested,
+        "model_state": best_state_copy(model),
+        "optimizer_state": optimizer.state_dict(),
+        "generator_state": generator.get_state(),
+        "torch_rng_state": capture_torch_rng_state(device),
+        "history": history,
+        "best_score": best_score,
+        "best_step": best_step,
+        "best_state": best_state,
+        "training_seconds": round(time.perf_counter() - started, 3),
+        "completed": completed,
+        "stopped_by_time_budget": stopped_by_time_budget,
+        "stopped_by_step_limit": stopped_by_step_limit,
+        "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+    }
+    atomic_torch_save(payload, path)
+
+
+def save_best_model_checkpoint(
+    path: Path,
+    *,
+    config: StageAJConfig,
+    label: str,
+    task: str,
+    step: int,
+    score: float,
+    best_state: dict[str, torch.Tensor],
+) -> None:
+    atomic_torch_save(
+        {
+            "schema_version": CHECKPOINT_SCHEMA_VERSION,
+            "experiment": EXPERIMENT_NAME,
+            "variant": label,
+            "task": task,
+            "config": asdict(config),
+            "best_step": step,
+            "best_score": score,
+            "model_state": best_state,
+            "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        },
+        path,
+    )
+
+
+@torch.no_grad()
+def write_training_sample_outputs(
+    model: nn.Module,
+    data: StageAJSet,
+    config: StageAJConfig,
+    *,
+    task: str,
+    device: torch.device,
+    output_dir: Path,
+    sample_count: int,
+) -> dict[str, object]:
+    count = min(max(0, sample_count), len(data.examples))
+    if count <= 0:
+        return {"sample_count": 0}
+    output_dir.mkdir(parents=True, exist_ok=True)
+    was_training = model.training
+    model.eval()
+    selected = data.subset(list(range(count))).to(device)
+    if task == "copy":
+        predicted = model(selected.source_image)["image"]
+        target_name = "source"
+    elif task == "edit":
+        predicted = model(selected.source_image, selected.edit_prompt)["image"]
+        no_source = model(selected.source_image, selected.edit_prompt, zero_source=True)["image"]
+        target_name = "target"
+    elif task == "generate":
+        predicted = model(selected.target_prompt)["image"]
+        target_name = "target_canonical"
+    else:
+        raise ValueError(f"unknown task: {task}")
+    if was_training:
+        model.train()
+
+    sample_meta: list[dict[str, object]] = []
+    for index, example in enumerate(selected.examples):
+        item: dict[str, object] = dict(example)
+        for name, image in (
+            ("source", selected.source_image[index]),
+            ("target", selected.target_image[index]),
+            ("target_canonical", selected.target_canonical_image[index]),
+        ):
+            path = output_dir / f"{index:02d}_{name}.png"
+            write_png(path, image.detach().cpu())
+            item[f"{name}_png"] = str(path)
+        predicted_path = output_dir / f"{index:02d}_{task}_predicted.png"
+        write_png(predicted_path, predicted[index].detach().cpu())
+        item["predicted_png"] = str(predicted_path)
+        item["target_for_task"] = target_name
+        if task == "edit":
+            no_source_path = output_dir / f"{index:02d}_edit_no_source.png"
+            write_png(no_source_path, no_source[index].detach().cpu())
+            item["no_source_png"] = str(no_source_path)
+        sample_meta.append(item)
+    metadata_path = output_dir / "samples.json"
+    metadata_path.write_text(json.dumps(sample_meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"sample_count": count, "samples_dir": str(output_dir), "samples_json": str(metadata_path)}
+
+
 def train_model(
     model: nn.Module,
     train: StageAJSet,
@@ -1134,6 +1377,9 @@ def train_model(
     device: torch.device,
     deadline: float | None,
     label: str,
+    checkpoint_dir: Path | None,
+    resume: bool,
+    stop_after_steps: int = 0,
 ) -> dict[str, object]:
     generator = torch.Generator(device=device)
     generator.manual_seed(seed)
@@ -1149,79 +1395,232 @@ def train_model(
         optimizer = torch.optim.AdamW(model.parameters(), lr=config.lr, weight_decay=0.01)
     best_score = float("inf")
     best_state: dict[str, torch.Tensor] | None = None
+    best_step = 0
     history: list[dict[str, object]] = []
     started = time.perf_counter()
     steps_completed = 0
     stopped_by_time_budget = False
-    for step in range(1, steps + 1):
-        if deadline_expired(deadline):
-            stopped_by_time_budget = True
-            break
-        batch = random_batch(train, generator=generator, batch_size=config.batch_size, device=device)
-        return_prefix = bool(getattr(model, "uses_hierarchical_loss", False))
-        if task == "copy":
-            output = model(batch.source_image, return_prefix=return_prefix) if return_prefix else model(batch.source_image)
-            predicted = output["image"]
-            target = batch.source_image
-            mask = batch.source_mask
-            attrs = batch.source_attrs
-        elif task == "edit":
-            output = (
-                model(batch.source_image, batch.edit_prompt, return_prefix=return_prefix)
-                if return_prefix
-                else model(batch.source_image, batch.edit_prompt)
+    stopped_by_step_limit = False
+    checkpoint_path = checkpoint_dir / "latest.pt" if checkpoint_dir is not None else None
+    best_checkpoint_path = checkpoint_dir / "best.pt" if checkpoint_dir is not None else None
+    resumed_from_checkpoint = False
+    resume_step = 0
+    resume_completed_checkpoint = False
+    if checkpoint_dir is not None:
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    if resume and checkpoint_path is not None:
+        payload = load_training_checkpoint(
+            checkpoint_path,
+            model=model,
+            optimizer=optimizer,
+            generator=generator,
+            config=config,
+            label=label,
+            task=task,
+            device=device,
+        )
+        if payload is not None:
+            resumed_from_checkpoint = True
+            resume_step = int(payload.get("step", 0))
+            steps_completed = resume_step
+            best_score = float(payload.get("best_score", float("inf")))
+            best_step = int(payload.get("best_step", 0))
+            payload_best_state = payload.get("best_state")
+            best_state = payload_best_state if isinstance(payload_best_state, dict) else None  # type: ignore[assignment]
+            payload_history = payload.get("history", [])
+            history = payload_history if isinstance(payload_history, list) else []
+            print(f"{label} resumed checkpoint step={resume_step} path={checkpoint_path}", flush=True)
+            if resume_step >= steps:
+                resume_completed_checkpoint = True
+                if best_state is not None:
+                    model.load_state_dict(best_state)
+                return {
+                    "history": history,
+                    "training_seconds": round(time.perf_counter() - started, 3),
+                    "train_steps_requested": steps,
+                    "train_steps_completed": resume_step,
+                    "stopped_by_time_budget": bool(payload.get("stopped_by_time_budget", False)),
+                    "stopped_by_step_limit": bool(payload.get("stopped_by_step_limit", False)),
+                    "trainable_parameter_count": count_parameters(model),
+                    "checkpoint_schema_version": CHECKPOINT_SCHEMA_VERSION,
+                    "checkpoint_path": str(checkpoint_path),
+                    "best_checkpoint_path": str(best_checkpoint_path) if best_checkpoint_path is not None else None,
+                    "best_step": best_step,
+                    "best_score": None if best_score == float("inf") else best_score,
+                    "resumed_from_checkpoint": True,
+                    "resume_step": resume_step,
+                    "resume_completed_checkpoint": resume_completed_checkpoint,
+                    "completed": True,
+                }
+    checkpoint_interval = effective_checkpoint_every(config)
+    start_step = steps_completed + 1
+    try:
+        for step in range(start_step, steps + 1):
+            if deadline_expired(deadline):
+                stopped_by_time_budget = True
+                break
+            batch = random_batch(train, generator=generator, batch_size=config.batch_size, device=device)
+            return_prefix = bool(getattr(model, "uses_hierarchical_loss", False))
+            if task == "copy":
+                output = model(batch.source_image, return_prefix=return_prefix) if return_prefix else model(batch.source_image)
+                predicted = output["image"]
+                target = batch.source_image
+                mask = batch.source_mask
+                attrs = batch.source_attrs
+            elif task == "edit":
+                output = (
+                    model(batch.source_image, batch.edit_prompt, return_prefix=return_prefix)
+                    if return_prefix
+                    else model(batch.source_image, batch.edit_prompt)
+                )
+                predicted = output["image"]
+                target = batch.target_image
+                mask = batch.target_mask
+                attrs = batch.target_attrs
+            elif task == "generate":
+                output = model(batch.target_prompt, return_prefix=return_prefix) if return_prefix else model(batch.target_prompt)
+                predicted = output["image"]
+                target = batch.target_canonical_image
+                mask = batch.target_mask
+                attrs = batch.target_attrs
+            else:
+                raise ValueError(f"unknown task: {task}")
+            if not isinstance(predicted, torch.Tensor):
+                raise TypeError("model output image must be a tensor")
+            loss = weighted_image_loss(predicted, target, mask, config)
+            if return_prefix:
+                loss = loss + hierarchical_aux_loss(output, target, mask, config)
+            if bool(getattr(model, "uses_object_aux_loss", False)):
+                loss = loss + object_aux_loss(output, attrs, mask, config)
+            optimizer.zero_grad(set_to_none=True)
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            optimizer.step()
+            steps_completed = step
+            should_evaluate = step == 1 or step % config.eval_every == 0 or step == steps
+            should_checkpoint = checkpoint_path is not None and (step % checkpoint_interval == 0 or step == steps)
+            if should_evaluate:
+                metrics = evaluate_model(model, val, config, task=task, device=device)
+                score = checkpoint_score(metrics)
+                if score < best_score:
+                    best_score = score
+                    best_step = step
+                    best_state = best_state_copy(model)
+                    if best_checkpoint_path is not None:
+                        save_best_model_checkpoint(
+                            best_checkpoint_path,
+                            config=config,
+                            label=label,
+                            task=task,
+                            step=step,
+                            score=score,
+                            best_state=best_state,
+                        )
+                item: dict[str, object] = {
+                    "step": step,
+                    "loss": round(float(loss.detach().cpu()), 6),
+                    "pixel_mse": metrics["pixel_mse"],
+                    "background_mse": metrics["background_mse"],
+                    "foreground_mse": metrics["foreground_mse"],
+                    "nearest_scene_exact": metrics["nearest_scene_exact"],
+                }
+                for key in ("aux_scene_exact", "aux_mask_iou", "aux_color_acc", "aux_shape_acc", "aux_position_acc"):
+                    if key in metrics:
+                        item[key] = metrics[key]
+                if (
+                    config.checkpoint_sample_count > 0
+                    and config.checkpoint_sample_every > 0
+                    and (step % config.checkpoint_sample_every == 0 or step == steps)
+                    and checkpoint_dir is not None
+                ):
+                    sample_info = write_training_sample_outputs(
+                        model,
+                        val,
+                        config,
+                        task=task,
+                        device=device,
+                        output_dir=checkpoint_dir / "samples" / f"step_{step:06d}",
+                        sample_count=config.checkpoint_sample_count,
+                    )
+                    item["checkpoint_samples"] = sample_info
+                history.append(item)
+                aux_text = ""
+                if "aux_scene_exact" in metrics:
+                    aux_text = f" aux={metrics['aux_scene_exact']:.3f} mask_iou={metrics.get('aux_mask_iou', 0.0):.3f}"
+                print(
+                    f"{label} step={step:4d} loss={float(loss.detach().cpu()):.6f} "
+                    f"mse={metrics['pixel_mse']:.5f} bg={metrics['background_mse']:.5f} "
+                    f"fg={metrics['foreground_mse']:.5f} scene={metrics['nearest_scene_exact']:.3f}{aux_text}",
+                    flush=True,
+                )
+            if should_checkpoint:
+                save_training_checkpoint(
+                    checkpoint_path,
+                    model=model,
+                    optimizer=optimizer,
+                    generator=generator,
+                    config=config,
+                    label=label,
+                    task=task,
+                    step=steps_completed,
+                    steps_requested=steps,
+                    history=history,
+                    best_score=best_score,
+                    best_step=best_step,
+                    best_state=best_state,
+                    started=started,
+                    device=device,
+                    completed=steps_completed >= steps,
+                    stopped_by_time_budget=stopped_by_time_budget,
+                    stopped_by_step_limit=stopped_by_step_limit,
+                )
+            if stop_after_steps > 0 and step >= stop_after_steps:
+                stopped_by_step_limit = True
+                break
+    except KeyboardInterrupt:
+        if checkpoint_path is not None and steps_completed > 0:
+            save_training_checkpoint(
+                checkpoint_path,
+                model=model,
+                optimizer=optimizer,
+                generator=generator,
+                config=config,
+                label=label,
+                task=task,
+                step=steps_completed,
+                steps_requested=steps,
+                history=history,
+                best_score=best_score,
+                best_step=best_step,
+                best_state=best_state,
+                started=started,
+                device=device,
+                completed=False,
+                stopped_by_time_budget=stopped_by_time_budget,
+                stopped_by_step_limit=stopped_by_step_limit,
             )
-            predicted = output["image"]
-            target = batch.target_image
-            mask = batch.target_mask
-            attrs = batch.target_attrs
-        elif task == "generate":
-            output = model(batch.target_prompt, return_prefix=return_prefix) if return_prefix else model(batch.target_prompt)
-            predicted = output["image"]
-            target = batch.target_canonical_image
-            mask = batch.target_mask
-            attrs = batch.target_attrs
-        else:
-            raise ValueError(f"unknown task: {task}")
-        if not isinstance(predicted, torch.Tensor):
-            raise TypeError("model output image must be a tensor")
-        loss = weighted_image_loss(predicted, target, mask, config)
-        if return_prefix:
-            loss = loss + hierarchical_aux_loss(output, target, mask, config)
-        if bool(getattr(model, "uses_object_aux_loss", False)):
-            loss = loss + object_aux_loss(output, attrs, mask, config)
-        optimizer.zero_grad(set_to_none=True)
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-        optimizer.step()
-        steps_completed = step
-        if step == 1 or step % config.eval_every == 0 or step == steps:
-            metrics = evaluate_model(model, val, config, task=task, device=device)
-            score = checkpoint_score(metrics)
-            if score < best_score:
-                best_score = score
-                best_state = best_state_copy(model)
-            item: dict[str, object] = {
-                "step": step,
-                "loss": round(float(loss.detach().cpu()), 6),
-                "pixel_mse": metrics["pixel_mse"],
-                "background_mse": metrics["background_mse"],
-                "foreground_mse": metrics["foreground_mse"],
-                "nearest_scene_exact": metrics["nearest_scene_exact"],
-            }
-            for key in ("aux_scene_exact", "aux_mask_iou", "aux_color_acc", "aux_shape_acc", "aux_position_acc"):
-                if key in metrics:
-                    item[key] = metrics[key]
-            history.append(item)
-            aux_text = ""
-            if "aux_scene_exact" in metrics:
-                aux_text = f" aux={metrics['aux_scene_exact']:.3f} mask_iou={metrics.get('aux_mask_iou', 0.0):.3f}"
-            print(
-                f"{label} step={step:4d} loss={float(loss.detach().cpu()):.6f} "
-                f"mse={metrics['pixel_mse']:.5f} bg={metrics['background_mse']:.5f} "
-                f"fg={metrics['foreground_mse']:.5f} scene={metrics['nearest_scene_exact']:.3f}{aux_text}",
-                flush=True,
-            )
+        raise
+    if checkpoint_path is not None and steps_completed > 0:
+        save_training_checkpoint(
+            checkpoint_path,
+            model=model,
+            optimizer=optimizer,
+            generator=generator,
+            config=config,
+            label=label,
+            task=task,
+            step=steps_completed,
+            steps_requested=steps,
+            history=history,
+            best_score=best_score,
+            best_step=best_step,
+            best_state=best_state,
+            started=started,
+            device=device,
+            completed=steps_completed >= steps,
+            stopped_by_time_budget=stopped_by_time_budget,
+            stopped_by_step_limit=stopped_by_step_limit,
+        )
     if best_state is not None:
         model.load_state_dict(best_state)
     return {
@@ -1230,7 +1629,17 @@ def train_model(
         "train_steps_requested": steps,
         "train_steps_completed": steps_completed,
         "stopped_by_time_budget": stopped_by_time_budget,
+        "stopped_by_step_limit": stopped_by_step_limit,
         "trainable_parameter_count": count_parameters(model),
+        "checkpoint_schema_version": CHECKPOINT_SCHEMA_VERSION,
+        "checkpoint_path": str(checkpoint_path) if checkpoint_path is not None else None,
+        "best_checkpoint_path": str(best_checkpoint_path) if best_checkpoint_path is not None else None,
+        "best_step": best_step,
+        "best_score": None if best_score == float("inf") else best_score,
+        "resumed_from_checkpoint": resumed_from_checkpoint,
+        "resume_step": resume_step,
+        "resume_completed_checkpoint": resume_completed_checkpoint,
+        "completed": steps_completed >= steps,
     }
 
 
@@ -1284,10 +1693,34 @@ def write_sample_outputs(
     return sample_meta
 
 
-def run_experiment(config: StageAJConfig, output_path: Path) -> dict[str, object]:
+def resolve_device(device_name: str) -> torch.device:
+    if device_name == "cpu":
+        return torch.device("cpu")
+    if device_name == "cuda":
+        if not torch.cuda.is_available():
+            raise RuntimeError("CUDA was requested but is not available")
+        return torch.device("cuda")
+    if device_name != "auto":
+        raise ValueError(f"unknown device: {device_name}")
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def variant_checkpoint_dir(root: Path | None, label: str) -> Path | None:
+    return None if root is None else root / label
+
+
+def run_experiment(
+    config: StageAJConfig,
+    output_path: Path,
+    *,
+    checkpoint_dir: Path | None = None,
+    resume: bool = False,
+    stop_after_steps: int = 0,
+    device_name: str = "auto",
+) -> dict[str, object]:
     random.seed(config.seed)
     torch.manual_seed(config.seed)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = resolve_device(device_name)
     print(f"stage_aj_transformer_image_io_fidelity device={device} seed={config.seed}", flush=True)
     if device.type == "cuda":
         torch.set_float32_matmul_precision("high")
@@ -1297,6 +1730,7 @@ def run_experiment(config: StageAJConfig, output_path: Path) -> dict[str, object
         print(f"gpu={torch.cuda.get_device_name(0)}", flush=True)
     started = time.perf_counter()
     deadline = started + config.max_train_seconds if config.max_train_seconds > 0 else None
+    checkpoint_root = checkpoint_dir or (output_path.parent / "checkpoints" / f"seed{config.seed}")
     data = load_data(config)
     train = data["train"].to(device)
     val = data["val"].to(device)
@@ -1308,7 +1742,7 @@ def run_experiment(config: StageAJConfig, output_path: Path) -> dict[str, object
     metrics: dict[str, object] = {}
     ablations: dict[str, object] = {}
 
-    if "transformer_copy" in config.variants:
+    if "transformer_copy" in config.variants and not deadline_expired(deadline):
         model = TransformerImageCopyModel(config).to(device)
         training["transformer_copy"] = train_model(
             model,
@@ -1321,10 +1755,13 @@ def run_experiment(config: StageAJConfig, output_path: Path) -> dict[str, object
             device=device,
             deadline=deadline,
             label="transformer_copy",
+            checkpoint_dir=variant_checkpoint_dir(checkpoint_root, "transformer_copy"),
+            resume=resume,
+            stop_after_steps=stop_after_steps,
         )
         metrics["transformer_copy"] = evaluate_model(model, test, config, task="copy", device=device)
         models["transformer_copy"] = model
-    if "memory_tree_copy" in config.variants:
+    if "memory_tree_copy" in config.variants and not deadline_expired(deadline):
         model = MemoryTreeImageCopyModel(config).to(device)
         training["memory_tree_copy"] = train_model(
             model,
@@ -1337,10 +1774,13 @@ def run_experiment(config: StageAJConfig, output_path: Path) -> dict[str, object
             device=device,
             deadline=deadline,
             label="memory_tree_copy",
+            checkpoint_dir=variant_checkpoint_dir(checkpoint_root, "memory_tree_copy"),
+            resume=resume,
+            stop_after_steps=stop_after_steps,
         )
         metrics["memory_tree_copy"] = evaluate_model(model, test, config, task="copy", device=device)
         models["memory_tree_copy"] = model
-    if "memory_tree_supervised_copy" in config.variants:
+    if "memory_tree_supervised_copy" in config.variants and not deadline_expired(deadline):
         model = MemoryTreeSupervisedCopyModel(config).to(device)
         training["memory_tree_supervised_copy"] = train_model(
             model,
@@ -1353,10 +1793,13 @@ def run_experiment(config: StageAJConfig, output_path: Path) -> dict[str, object
             device=device,
             deadline=deadline,
             label="memory_tree_supervised_copy",
+            checkpoint_dir=variant_checkpoint_dir(checkpoint_root, "memory_tree_supervised_copy"),
+            resume=resume,
+            stop_after_steps=stop_after_steps,
         )
         metrics["memory_tree_supervised_copy"] = evaluate_model(model, test, config, task="copy", device=device)
         models["memory_tree_supervised_copy"] = model
-    if "transformer_edit" in config.variants:
+    if "transformer_edit" in config.variants and not deadline_expired(deadline):
         model = TransformerImageEditorModel(config).to(device)
         training["transformer_edit"] = train_model(
             model,
@@ -1369,6 +1812,9 @@ def run_experiment(config: StageAJConfig, output_path: Path) -> dict[str, object
             device=device,
             deadline=deadline,
             label="transformer_edit",
+            checkpoint_dir=variant_checkpoint_dir(checkpoint_root, "transformer_edit"),
+            resume=resume,
+            stop_after_steps=stop_after_steps,
         )
         metrics["transformer_edit"] = evaluate_model(model, test, config, task="edit", device=device)
         ablations["transformer_edit_no_source"] = evaluate_model(
@@ -1380,7 +1826,7 @@ def run_experiment(config: StageAJConfig, output_path: Path) -> dict[str, object
             zero_source=True,
         )
         models["transformer_edit"] = model
-    if "memory_tree_edit" in config.variants:
+    if "memory_tree_edit" in config.variants and not deadline_expired(deadline):
         model = MemoryTreeImageEditorModel(config).to(device)
         training["memory_tree_edit"] = train_model(
             model,
@@ -1393,6 +1839,9 @@ def run_experiment(config: StageAJConfig, output_path: Path) -> dict[str, object
             device=device,
             deadline=deadline,
             label="memory_tree_edit",
+            checkpoint_dir=variant_checkpoint_dir(checkpoint_root, "memory_tree_edit"),
+            resume=resume,
+            stop_after_steps=stop_after_steps,
         )
         metrics["memory_tree_edit"] = evaluate_model(model, test, config, task="edit", device=device)
         ablations["memory_tree_edit_no_source"] = evaluate_model(
@@ -1404,7 +1853,7 @@ def run_experiment(config: StageAJConfig, output_path: Path) -> dict[str, object
             zero_source=True,
         )
         models["memory_tree_edit"] = model
-    if "memory_tree_supervised_edit" in config.variants:
+    if "memory_tree_supervised_edit" in config.variants and not deadline_expired(deadline):
         model = MemoryTreeSupervisedEditorModel(config).to(device)
         training["memory_tree_supervised_edit"] = train_model(
             model,
@@ -1417,6 +1866,9 @@ def run_experiment(config: StageAJConfig, output_path: Path) -> dict[str, object
             device=device,
             deadline=deadline,
             label="memory_tree_supervised_edit",
+            checkpoint_dir=variant_checkpoint_dir(checkpoint_root, "memory_tree_supervised_edit"),
+            resume=resume,
+            stop_after_steps=stop_after_steps,
         )
         metrics["memory_tree_supervised_edit"] = evaluate_model(model, test, config, task="edit", device=device)
         ablations["memory_tree_supervised_edit_no_source"] = evaluate_model(
@@ -1428,7 +1880,7 @@ def run_experiment(config: StageAJConfig, output_path: Path) -> dict[str, object
             zero_source=True,
         )
         models["memory_tree_supervised_edit"] = model
-    if "text_supervised_generate" in config.variants:
+    if "text_supervised_generate" in config.variants and not deadline_expired(deadline):
         model = TextSupervisedGenerationModel(config).to(device)
         training["text_supervised_generate"] = train_model(
             model,
@@ -1441,10 +1893,13 @@ def run_experiment(config: StageAJConfig, output_path: Path) -> dict[str, object
             device=device,
             deadline=deadline,
             label="text_supervised_generate",
+            checkpoint_dir=variant_checkpoint_dir(checkpoint_root, "text_supervised_generate"),
+            resume=resume,
+            stop_after_steps=stop_after_steps,
         )
         metrics["text_supervised_generate"] = evaluate_model(model, test, config, task="generate", device=device)
         models["text_supervised_generate"] = model
-    if any(variant.endswith("_edit") for variant in config.variants):
+    if any(variant.endswith("_edit") for variant in models):
         ablations["source_image_no_edit"] = evaluate_source_no_edit(test, config, device=device)
     samples = write_sample_outputs(
         models,
@@ -1455,9 +1910,20 @@ def run_experiment(config: StageAJConfig, output_path: Path) -> dict[str, object
     )
     stopped_by_time_budget = any(bool(item.get("stopped_by_time_budget")) for item in training.values() if isinstance(item, dict))
     output = {
-        "experiment": "omni_transformer_stage_aj_transformer_image_io_fidelity",
+        "schema_version": 2,
+        "experiment": EXPERIMENT_NAME,
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "config": asdict(config),
+        "run_control": {
+            "checkpoint_schema_version": CHECKPOINT_SCHEMA_VERSION,
+            "checkpoint_dir": str(checkpoint_root),
+            "resume_requested": resume,
+            "stop_after_steps": stop_after_steps,
+            "device_request": device_name,
+            "effective_checkpoint_every": effective_checkpoint_every(config),
+            "checkpoint_sample_every": config.checkpoint_sample_every,
+            "checkpoint_sample_count": config.checkpoint_sample_count,
+        },
         "architecture": {
             "task": "Transformer-only image input -> latent -> full image redraw fidelity",
             "transformer_copy": "patch-token image encoder -> fixed latent tokens -> Transformer patch decoder reconstructs the full source image",
@@ -1495,6 +1961,8 @@ def run_experiment(config: StageAJConfig, output_path: Path) -> dict[str, object
         "ablations": ablations,
         "samples": samples,
         "stopped_by_time_budget": stopped_by_time_budget,
+        "stopped_by_step_limit": any(bool(item.get("stopped_by_step_limit")) for item in training.values() if isinstance(item, dict)),
+        "skipped_variants": [variant for variant in config.variants if variant not in training],
         "total_seconds": round(time.perf_counter() - started, 3),
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1596,6 +2064,8 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=Path("artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/result.json"))
     parser.add_argument("--output-dir", type=Path, default=Path("artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/sweep_runs"))
     parser.add_argument("--aggregate", type=Path, default=Path("artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/sweep_results.json"))
+    parser.add_argument("--checkpoint-dir", type=Path, default=None)
+    parser.add_argument("--resume", action="store_true")
     parser.add_argument("--sweep", action="store_true")
     parser.add_argument("--seeds", default="20260701")
     parser.add_argument("--variants", default="memory_tree_supervised_copy")
@@ -1627,6 +2097,11 @@ def main() -> None:
     parser.add_argument("--object-aux-mask-positive-weight", type=float, default=8.0)
     parser.add_argument("--torch-num-threads", type=int, default=1)
     parser.add_argument("--max-train-seconds", type=int, default=129_600)
+    parser.add_argument("--checkpoint-every", type=int, default=0)
+    parser.add_argument("--checkpoint-sample-every", type=int, default=300)
+    parser.add_argument("--checkpoint-sample-count", type=int, default=2)
+    parser.add_argument("--stop-after-steps", type=int, default=0)
+    parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
     args = parser.parse_args()
     if args.torch_num_threads > 0:
         torch.set_num_threads(args.torch_num_threads)
@@ -1676,19 +2151,39 @@ def main() -> None:
         object_aux_mask_loss_weight=args.object_aux_mask_loss_weight,
         object_aux_mask_positive_weight=args.object_aux_mask_positive_weight,
         max_train_seconds=args.max_train_seconds,
+        checkpoint_every=args.checkpoint_every,
+        checkpoint_sample_every=args.checkpoint_sample_every,
+        checkpoint_sample_count=args.checkpoint_sample_count,
         variants=variants,
     )
     if args.sweep:
         runs = []
         for seed in parse_csv_ints(args.seeds):
             config = StageAJConfig(**{**asdict(base_config), "seed": seed})
-            runs.append(run_experiment(config, args.output_dir / f"seed{seed}" / "result.json"))
+            seed_checkpoint_dir = args.checkpoint_dir / f"seed{seed}" if args.checkpoint_dir is not None else None
+            runs.append(
+                run_experiment(
+                    config,
+                    args.output_dir / f"seed{seed}" / "result.json",
+                    checkpoint_dir=seed_checkpoint_dir,
+                    resume=args.resume,
+                    stop_after_steps=args.stop_after_steps,
+                    device_name=args.device,
+                )
+            )
         aggregate = aggregate_runs(runs)
         args.aggregate.parent.mkdir(parents=True, exist_ok=True)
         args.aggregate.write_text(json.dumps(aggregate, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"wrote {args.aggregate}", flush=True)
     else:
-        run_experiment(base_config, args.output)
+        run_experiment(
+            base_config,
+            args.output,
+            checkpoint_dir=args.checkpoint_dir,
+            resume=args.resume,
+            stop_after_steps=args.stop_after_steps,
+            device_name=args.device,
+        )
 
 
 if __name__ == "__main__":

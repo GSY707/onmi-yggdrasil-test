@@ -2,6 +2,10 @@
 
 这是一个用于验证 `Project-Yggdrasil 未来多模态潜空间智能体架构` 的实验仓库。它还不是成品模型，也不是可以直接拿来和成熟多模态项目比较的系统；这里主要记录一些小模型、本机实验和合成任务里的可行性证据。
 
+如果这个项目成功，那么会有两个优点：
+- 1，更高效的推理，在传统的语言思维链中，模型仍然需要把一部分注意力用于组织语言，而不是全部用于思考，大家可以发现，一些高级模型泄漏的推理token中，有很多不可读的语句，这应该是专注推理的表现。
+- 2，原生的无限模态，这个架构在训练初期建立一个潜空间，之后再把各个模态接入潜空间，这不但意味着模型的各个模态可以在同一个向量空间中推理，还使得后期可以添加更多输入、输出路径。比如可以接入动作机械、激光雷达，你可以让学会交通规则的模型去开车，而不是在图像大量训练中识别交通信号灯（比如VA）。具身智能也可以走这条路，并完全基于已有的模型。
+
 旧版 README 的长命令清单已归档到 `docs/archive/README-2026-07-04-legacy-command-list.md`。
 
 ## 最近的图像生成和编辑成果
@@ -19,8 +23,8 @@ Stage AJ 把任务改得更接近未来图像编辑：整张源图先切成 patc
 目前最好的正向结果来自对象属性和 mask 辅助监督：
 
 - `memory_tree_supervised_copy` 在正式 copy-only 任务上达到 100% scene exact，foreground MSE 为 0.000794，辅助对象表和 mask IoU 也是 100%。
-- `memory_tree_supervised_edit` 在 probe 规模达到 99.22% scene exact；去掉源图后只有 5.08%，说明源图信息确实进入了 latent。
-- `text_supervised_generate` 在规范背景生成任务上达到 100% scene exact。
+- `memory_tree_supervised_edit` 在正式单 seed 长训中达到 99.02% scene exact；去掉源图后只有 4.10%，说明源图信息确实进入了 latent。
+- `text_supervised_generate` 在正式单 seed 规范背景生成任务上达到 100% scene exact。
 
 这部分的含义比较朴素：输出专家不是完全画不回来，关键是 latent 里要有清楚的对象约束。没有对象属性和 mask 监督时，模型容易只学背景，丢掉前景物体。
 
@@ -62,8 +66,9 @@ Stage AJ 把任务改得更接近未来图像编辑：整张源图先切成 patc
 - Stage AK 证明了先训练统一 object/pair latent bus 后，relation 任务里的对象检索和位置比较可以同时闭合：pair row/col、left/right retrieval、relation compare 都达到约 99%-100%。
 - Stage AL 进一步证明硬化后的统一潜空间可以接入答案输出头：model-selected answer 达到 99.61%，no-evidence answer 约 60.35%。
 - Stage AM 把难度拉回 color/shape/count/relation 四任务后，证明 cell/count slots 必须成为一等 latent bus：加入 count 输入专家和 decoded position compare 后，四任务 model answer 达到 98.24%，count/color/shape 均 100%，relation 为 92.97%，no-evidence answer 为 27.54%。
+- Stage AN/AQ 进一步证明统一 bus 可以接 answer-token writer，并且 relation 需要显式 delta/truth-table 过程状态：Stage AN answer-token sequence exact 为 98.11%，Stage AQ 把 relation sequence exact 提到 99.74%，no-evidence relation truth-table 约 50.52%。
 - Stage AI 证明了低熵图像生成/编辑链路能闭合。
-- Stage AJ 证明了 Transformer patch decoder 加对象/mask 辅助监督后，可以从 latent 完整重绘合成对象图，并在 probe 规模完成源图编辑。
+- Stage AJ/AP 证明了 Transformer patch decoder 加对象/mask 辅助监督后，可以从 latent 完整重绘合成对象图，并在正式单 seed 长训中完成源图编辑和规范背景文本生成。
 
 还没有证明的东西也要说清楚：这里没有证明真实照片级生成质量，没有证明真实 VLM 能力，没有证明完整潜空间推理，也没有证明 provider 级 KV Cache 物理剪枝。当前仓库的价值主要是把路线拆成一个个能跑、能消融、能归档的小证据。
 

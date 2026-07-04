@@ -54,6 +54,11 @@ class StageAKConfig:
     lr: float = 8e-4
     steps: int = 1600
     eval_every: int = 400
+    answer_len: int = 6
+    token_loss_weight: float = 1.0
+    process_loss_weight: float = 0.0
+    process_state_weight: float = 1.0
+    truth_table_state_weight: float = 1.0
     temperature: float = 0.07
     slot_loss_weight: float = 1.0
     query_loss_weight: float = 1.0
@@ -120,11 +125,30 @@ class UnifiedLatentBus(nn.Module):
             nn.GELU(),
             nn.Linear(config.d_model * 2, 2),
         )
+        delta_class_count = config.grid_size * 2 - 1
+        self.delta_row_head = nn.Linear(config.d_model, delta_class_count)
+        self.delta_col_head = nn.Linear(config.d_model, delta_class_count)
+        self.truth_table_head = nn.Linear(config.d_model, 2)
+        self.delta_value = nn.Linear(delta_class_count * 2, config.d_model, bias=False)
+        self.truth_table_value = nn.Linear(2, config.d_model, bias=False)
+        self.relation_process_norm = nn.LayerNorm(config.d_model)
         self.answer_writer = nn.Sequential(
             nn.Linear(config.d_model * 4, config.d_model * 2),
             nn.GELU(),
             nn.Linear(config.d_model * 2, ANSWER_CLASS_COUNT),
         )
+        self.answer_token_query = nn.Parameter(torch.randn(config.answer_len, config.d_model) * 0.02)
+        answer_token_layer = nn.TransformerEncoderLayer(
+            d_model=config.d_model,
+            nhead=config.heads,
+            dim_feedforward=config.d_model * 4,
+            dropout=0.0,
+            batch_first=True,
+            norm_first=True,
+        )
+        self.answer_token_decoder = nn.TransformerEncoder(answer_token_layer, num_layers=config.layers)
+        self.answer_token_norm = nn.LayerNorm(config.d_model)
+        self.answer_token_out = nn.Linear(config.d_model, VOCAB_SIZE)
         self.relation_answer_state = nn.Sequential(
             nn.Linear(config.d_model * 3, config.d_model * 2),
             nn.GELU(),
@@ -200,10 +224,23 @@ class UnifiedLatentBus(nn.Module):
             (self.decoded_position_state(left_model), self.decoded_position_state(right_model), op_model),
             dim=-1,
         )
-        teacher_relation = self.relation_answer_state(teacher_context)
-        model_relation = self.relation_answer_state(model_context)
+        teacher_relation, teacher_delta_row, teacher_delta_col, teacher_truth_table, teacher_learned_truth_table = (
+            self.relation_process(
+                teacher_context,
+                op_logits,
+                forced_delta_row=batch.target_delta_row,
+                forced_delta_col=batch.target_delta_col,
+                forced_op=batch.target_relation_op,
+            )
+        )
+        model_relation, model_delta_row, model_delta_col, model_truth_table, model_learned_truth_table = self.relation_process(
+            model_context,
+            op_logits,
+        )
         teacher_answer_context = torch.cat((question, cell_teacher, count_teacher, teacher_relation), dim=-1)
         model_answer_context = torch.cat((question, cell_model, count_model, model_relation), dim=-1)
+        teacher_answer_tokens = self.decode_answer_tokens(question, cell_teacher, count_teacher, teacher_relation)
+        model_answer_tokens = self.decode_answer_tokens(question, cell_model, count_model, model_relation)
         return {
             "slots": pair_slots,
             "cell_slots": cell_slots,
@@ -224,11 +261,78 @@ class UnifiedLatentBus(nn.Module):
             "relation_op": op_logits,
             "teacher_compare": self.compare(teacher_context),
             "model_compare": self.compare(model_context),
+            "teacher_delta_row": teacher_delta_row,
+            "teacher_delta_col": teacher_delta_col,
+            "teacher_truth_table": teacher_truth_table,
+            "teacher_learned_truth_table": teacher_learned_truth_table,
+            "model_delta_row": model_delta_row,
+            "model_delta_col": model_delta_col,
+            "model_truth_table": model_truth_table,
+            "model_learned_truth_table": model_learned_truth_table,
             "teacher_count_value": self.count_head(count_teacher),
             "model_count_value": self.count_head(count_model),
             "teacher_answer": self.answer_writer(teacher_answer_context),
             "model_answer": self.answer_writer(model_answer_context),
+            "teacher_answer_tokens": teacher_answer_tokens,
+            "model_answer_tokens": model_answer_tokens,
         }
+
+    def relation_process(
+        self,
+        context: torch.Tensor,
+        op_logits: torch.Tensor,
+        *,
+        forced_delta_row: torch.Tensor | None = None,
+        forced_delta_col: torch.Tensor | None = None,
+        forced_op: torch.Tensor | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        relation = self.relation_answer_state(context)
+        delta_row = self.delta_row_head(relation)
+        delta_col = self.delta_col_head(relation)
+        learned_truth_table = self.truth_table_head(relation)
+        truth_table = self.deterministic_truth_table(delta_row, delta_col, op_logits, forced_delta_row, forced_delta_col, forced_op)
+        process_state = self.delta_value(torch.cat((delta_row, delta_col), dim=-1))
+        truth_state = self.truth_table_value(F.softmax(truth_table, dim=-1))
+        relation = self.relation_process_norm(
+            relation
+            + self.config.process_state_weight * process_state
+            + self.config.truth_table_state_weight * truth_state
+        )
+        return relation, delta_row, delta_col, truth_table, learned_truth_table
+
+    def deterministic_truth_table(
+        self,
+        delta_row_logits: torch.Tensor,
+        delta_col_logits: torch.Tensor,
+        op_logits: torch.Tensor,
+        forced_delta_row: torch.Tensor | None,
+        forced_delta_col: torch.Tensor | None,
+        forced_op: torch.Tensor | None,
+    ) -> torch.Tensor:
+        center = self.config.grid_size - 1
+        delta_row = forced_delta_row.clamp_min(0) if forced_delta_row is not None else delta_row_logits.argmax(dim=-1)
+        delta_col = forced_delta_col.clamp_min(0) if forced_delta_col is not None else delta_col_logits.argmax(dim=-1)
+        op = forced_op.clamp_min(0) if forced_op is not None else op_logits.argmax(dim=-1)
+        truth = torch.zeros_like(op)
+        truth = torch.where(op == 0, delta_col < center, truth.bool())
+        truth = torch.where(op == 1, delta_col > center, truth)
+        truth = torch.where(op == 2, delta_row < center, truth)
+        truth = torch.where(op == 3, delta_row > center, truth)
+        truth_logits = F.one_hot(truth.long(), num_classes=2).to(dtype=delta_row_logits.dtype)
+        return truth_logits * 20.0 - 10.0
+
+    def decode_answer_tokens(
+        self,
+        question: torch.Tensor,
+        cell: torch.Tensor,
+        count: torch.Tensor,
+        relation: torch.Tensor,
+    ) -> torch.Tensor:
+        context = torch.stack((question, cell, count, relation), dim=1)
+        query = self.answer_token_query.unsqueeze(0).expand(question.shape[0], -1, -1)
+        decoded = self.answer_token_decoder(torch.cat((context, query), dim=1))
+        token_latent = self.answer_token_norm(decoded[:, -self.config.answer_len :])
+        return self.answer_token_out(token_latent)
 
 
 def optional_ce(logits: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
@@ -287,9 +391,27 @@ def compare_loss(outputs: dict[str, torch.Tensor], batch: StageACSet, *, model: 
     return optional_ce(outputs[name], batch.target_relation)
 
 
+def process_loss(outputs: dict[str, torch.Tensor], batch: StageACSet, *, model: bool) -> torch.Tensor:
+    prefix = "model" if model else "teacher"
+    return (
+        optional_ce(outputs[f"{prefix}_delta_row"], batch.target_delta_row)
+        + optional_ce(outputs[f"{prefix}_delta_col"], batch.target_delta_col)
+        + optional_ce(outputs[f"{prefix}_learned_truth_table"], batch.target_relation)
+    )
+
+
 def answer_loss(outputs: dict[str, torch.Tensor], batch: StageACSet, *, model: bool) -> torch.Tensor:
     name = "model_answer" if model else "teacher_answer"
     return optional_ce(outputs[name], answer_target(batch))
+
+
+def sequence_loss(logits: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    return F.cross_entropy(logits.reshape(-1, logits.shape[-1]), target.reshape(-1), ignore_index=PAD)
+
+
+def answer_token_loss(outputs: dict[str, torch.Tensor], batch: StageACSet, *, model: bool) -> torch.Tensor:
+    name = "model_answer_tokens" if model else "teacher_answer_tokens"
+    return sequence_loss(outputs[name], batch.answers)
 
 
 def selected_count_loss(outputs: dict[str, torch.Tensor], batch: StageACSet, *, model: bool) -> torch.Tensor:
@@ -317,6 +439,19 @@ def accuracy(logits: torch.Tensor, target: torch.Tensor) -> float:
     return (logits.argmax(dim=-1)[mask] == target[mask]).float().mean().item()
 
 
+def token_metrics(logits: torch.Tensor, target: torch.Tensor) -> dict[str, float]:
+    pred = logits.argmax(dim=-1)
+    non_pad = target != PAD
+    token_accuracy = (pred[non_pad] == target[non_pad]).float().mean().item() if non_pad.any() else 0.0
+    sequence_exact = ((pred == target) | ~non_pad).all(dim=1).float().mean().item()
+    answer_word_exact = (pred[:, 1] == target[:, 1]).float().mean().item()
+    return {
+        "token_accuracy": token_accuracy,
+        "sequence_exact": sequence_exact,
+        "answer_word_exact": answer_word_exact,
+    }
+
+
 def metrics(outputs: dict[str, torch.Tensor], batch: StageACSet) -> dict[str, float]:
     pair_pred = (torch.sigmoid(outputs["occupied"]) > 0.5).float()
     cell_pred = (torch.sigmoid(outputs["cell_occupied"]) > 0.5).float()
@@ -324,6 +459,8 @@ def metrics(outputs: dict[str, torch.Tensor], batch: StageACSet) -> dict[str, fl
     occupied_cells = batch.grid_occupied > 0.5
     target_answer = answer_target(batch)
     count_table_ok = (outputs["count"].argmax(dim=-1) == batch.count_table).all(dim=1)
+    teacher_token = token_metrics(outputs["teacher_answer_tokens"], batch.answers)
+    model_token = token_metrics(outputs["model_answer_tokens"], batch.answers)
     result = {
         "pair_occupancy_exact": (pair_pred == batch.pair_occupied).all(dim=1).float().mean().item(),
         "cell_occupancy_exact": (cell_pred == batch.grid_occupied).all(dim=1).float().mean().item(),
@@ -334,8 +471,22 @@ def metrics(outputs: dict[str, torch.Tensor], batch: StageACSet) -> dict[str, fl
         "relation_op_accuracy": accuracy(outputs["relation_op"], batch.target_relation_op),
         "teacher_compare_accuracy": accuracy(outputs["teacher_compare"], batch.target_relation),
         "model_compare_accuracy": accuracy(outputs["model_compare"], batch.target_relation),
+        "teacher_delta_row_accuracy": accuracy(outputs["teacher_delta_row"], batch.target_delta_row),
+        "teacher_delta_col_accuracy": accuracy(outputs["teacher_delta_col"], batch.target_delta_col),
+        "teacher_truth_table_accuracy": accuracy(outputs["teacher_truth_table"], batch.target_relation),
+        "teacher_learned_truth_table_accuracy": accuracy(outputs["teacher_learned_truth_table"], batch.target_relation),
+        "model_delta_row_accuracy": accuracy(outputs["model_delta_row"], batch.target_delta_row),
+        "model_delta_col_accuracy": accuracy(outputs["model_delta_col"], batch.target_delta_col),
+        "model_truth_table_accuracy": accuracy(outputs["model_truth_table"], batch.target_relation),
+        "model_learned_truth_table_accuracy": accuracy(outputs["model_learned_truth_table"], batch.target_relation),
         "teacher_answer_accuracy": accuracy(outputs["teacher_answer"], target_answer),
         "model_answer_accuracy": accuracy(outputs["model_answer"], target_answer),
+        "teacher_answer_token_accuracy": teacher_token["token_accuracy"],
+        "teacher_answer_sequence_exact": teacher_token["sequence_exact"],
+        "teacher_answer_word_exact": teacher_token["answer_word_exact"],
+        "model_answer_token_accuracy": model_token["token_accuracy"],
+        "model_answer_sequence_exact": model_token["sequence_exact"],
+        "model_answer_word_exact": model_token["answer_word_exact"],
         "teacher_count_value_accuracy": accuracy(outputs["teacher_count_value"], batch.target_count),
         "model_count_value_accuracy": accuracy(outputs["model_count_value"], batch.target_count),
     }
@@ -356,6 +507,10 @@ def metrics(outputs: dict[str, torch.Tensor], batch: StageACSet) -> dict[str, fl
             result[f"answer_{family}_accuracy"] = (
                 outputs["model_answer"].argmax(dim=-1)[mask] == target_answer[mask]
             ).float().mean().item()
+            family_token = token_metrics(outputs["model_answer_tokens"][mask], batch.answers[mask])
+            result[f"answer_{family}_token_accuracy"] = family_token["token_accuracy"]
+            result[f"answer_{family}_sequence_exact"] = family_token["sequence_exact"]
+            result[f"answer_{family}_word_exact"] = family_token["answer_word_exact"]
             result[f"count_table_{family}_exact"] = count_table_ok[mask].float().mean().item()
             if family == "count_color_shape":
                 result[f"teacher_count_value_{family}_accuracy"] = (
@@ -363,6 +518,19 @@ def metrics(outputs: dict[str, torch.Tensor], batch: StageACSet) -> dict[str, fl
                 ).float().mean().item()
                 result[f"model_count_value_{family}_accuracy"] = (
                     outputs["model_count_value"].argmax(dim=-1)[mask] == batch.target_count[mask]
+                ).float().mean().item()
+            if family == "relation_yes_no":
+                result[f"model_delta_row_{family}_accuracy"] = (
+                    outputs["model_delta_row"].argmax(dim=-1)[mask] == batch.target_delta_row[mask]
+                ).float().mean().item()
+                result[f"model_delta_col_{family}_accuracy"] = (
+                    outputs["model_delta_col"].argmax(dim=-1)[mask] == batch.target_delta_col[mask]
+                ).float().mean().item()
+                result[f"model_truth_table_{family}_accuracy"] = (
+                    outputs["model_truth_table"].argmax(dim=-1)[mask] == batch.target_relation[mask]
+                ).float().mean().item()
+                result[f"model_learned_truth_table_{family}_accuracy"] = (
+                    outputs["model_learned_truth_table"].argmax(dim=-1)[mask] == batch.target_relation[mask]
                 ).float().mean().item()
     return result
 
@@ -402,6 +570,7 @@ def run_one(config: StageAKConfig, output_path: Path) -> dict[str, object]:
         grid_size=config.grid_size,
         max_objects=config.max_objects,
         prompt_len=config.prompt_len,
+        answer_len=config.answer_len,
         d_model=config.d_model,
         heads=config.heads,
         layers=config.layers,
@@ -425,8 +594,12 @@ def run_one(config: StageAKConfig, output_path: Path) -> dict[str, object]:
             loss_query = query_loss(outputs, batch)
             loss_teacher = compare_loss(outputs, batch, model=False)
             loss_model = compare_loss(outputs, batch, model=True)
+            loss_process_teacher = process_loss(outputs, batch, model=False)
+            loss_process_model = process_loss(outputs, batch, model=True)
             loss_answer_teacher = answer_loss(outputs, batch, model=False)
             loss_answer_model = answer_loss(outputs, batch, model=True)
+            loss_token_teacher = answer_token_loss(outputs, batch, model=False)
+            loss_token_model = answer_token_loss(outputs, batch, model=True)
             loss_count_teacher = selected_count_loss(outputs, batch, model=False)
             loss_count_model = selected_count_loss(outputs, batch, model=True)
             loss = (
@@ -434,7 +607,9 @@ def run_one(config: StageAKConfig, output_path: Path) -> dict[str, object]:
                 + config.query_loss_weight * loss_query
                 + config.compare_loss_weight * loss_teacher
                 + config.model_compare_loss_weight * loss_model
+                + config.process_loss_weight * (loss_process_teacher + loss_process_model)
                 + config.answer_loss_weight * (loss_answer_teacher + loss_answer_model)
+                + config.token_loss_weight * (loss_token_teacher + loss_token_model)
                 + config.selected_count_loss_weight * (loss_count_teacher + loss_count_model)
             )
         optimizer.zero_grad(set_to_none=True)
@@ -449,8 +624,12 @@ def run_one(config: StageAKConfig, output_path: Path) -> dict[str, object]:
             row["loss_query"] = float(loss_query.detach().cpu())
             row["loss_teacher_compare"] = float(loss_teacher.detach().cpu())
             row["loss_model_compare"] = float(loss_model.detach().cpu())
+            row["loss_teacher_process"] = float(loss_process_teacher.detach().cpu())
+            row["loss_model_process"] = float(loss_process_model.detach().cpu())
             row["loss_teacher_answer"] = float(loss_answer_teacher.detach().cpu())
             row["loss_model_answer"] = float(loss_answer_model.detach().cpu())
+            row["loss_teacher_answer_tokens"] = float(loss_token_teacher.detach().cpu())
+            row["loss_model_answer_tokens"] = float(loss_token_model.detach().cpu())
             row["loss_teacher_count"] = float(loss_count_teacher.detach().cpu())
             row["loss_model_count"] = float(loss_count_model.detach().cpu())
             history.append(row)
@@ -465,7 +644,7 @@ def run_one(config: StageAKConfig, output_path: Path) -> dict[str, object]:
             "cost": {"seconds": round(time.perf_counter() - started, 4), "amp": use_amp},
             "interpretation": {
                 "goal": "Train first-class pair/cell/count latent slots before final answer-token reasoning.",
-                "success_condition": "slot readout, question-to-slot retrieval, relation compare, and family answers should expose which slots are hard enough.",
+                "success_condition": "Stage AN uses answer-token exact and no-evidence gap as the primary gate; class head metrics remain diagnostic.",
             },
         }
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -503,16 +682,33 @@ def aggregate_runs(runs: list[dict[str, object]]) -> dict[str, object]:
         "full_relation_op_accuracy": means.get("test.full_relation_op_accuracy"),
         "full_teacher_compare_accuracy": means.get("test.full_teacher_compare_accuracy"),
         "full_model_compare_accuracy": means.get("test.full_model_compare_accuracy"),
+        "full_model_delta_row_accuracy": means.get("test.full_model_delta_row_accuracy"),
+        "full_model_delta_col_accuracy": means.get("test.full_model_delta_col_accuracy"),
+        "full_model_truth_table_accuracy": means.get("test.full_model_truth_table_accuracy"),
         "full_teacher_answer_accuracy": means.get("test.full_teacher_answer_accuracy"),
         "full_model_answer_accuracy": means.get("test.full_model_answer_accuracy"),
+        "full_model_answer_token_accuracy": means.get("test.full_model_answer_token_accuracy"),
+        "full_model_answer_sequence_exact": means.get("test.full_model_answer_sequence_exact"),
+        "full_model_answer_word_exact": means.get("test.full_model_answer_word_exact"),
         "full_teacher_count_value_accuracy": means.get("test.full_teacher_count_value_accuracy"),
         "full_model_count_value_accuracy": means.get("test.full_model_count_value_accuracy"),
         "no_evidence_model_compare_accuracy": means.get("test.no_evidence_model_compare_accuracy"),
+        "no_evidence_model_truth_table_accuracy": means.get("test.no_evidence_model_truth_table_accuracy"),
         "no_evidence_model_answer_accuracy": means.get("test.no_evidence_model_answer_accuracy"),
+        "no_evidence_model_answer_sequence_exact": means.get("test.no_evidence_model_answer_sequence_exact"),
+        "no_evidence_model_answer_word_exact": means.get("test.no_evidence_model_answer_word_exact"),
         "answer_color_at_cell_accuracy": means.get("test.full_answer_color_at_cell_accuracy"),
         "answer_shape_at_cell_accuracy": means.get("test.full_answer_shape_at_cell_accuracy"),
         "answer_count_color_shape_accuracy": means.get("test.full_answer_count_color_shape_accuracy"),
         "answer_relation_yes_no_accuracy": means.get("test.full_answer_relation_yes_no_accuracy"),
+        "answer_color_at_cell_sequence_exact": means.get("test.full_answer_color_at_cell_sequence_exact"),
+        "answer_shape_at_cell_sequence_exact": means.get("test.full_answer_shape_at_cell_sequence_exact"),
+        "answer_count_color_shape_sequence_exact": means.get("test.full_answer_count_color_shape_sequence_exact"),
+        "answer_relation_yes_no_sequence_exact": means.get("test.full_answer_relation_yes_no_sequence_exact"),
+        "relation_delta_row_accuracy": means.get("test.full_model_delta_row_relation_yes_no_accuracy"),
+        "relation_delta_col_accuracy": means.get("test.full_model_delta_col_relation_yes_no_accuracy"),
+        "relation_truth_table_accuracy": means.get("test.full_model_truth_table_relation_yes_no_accuracy"),
+        "no_evidence_relation_truth_table_accuracy": means.get("test.no_evidence_model_truth_table_relation_yes_no_accuracy"),
         "count_table_count_color_shape_exact": means.get("test.full_count_table_count_color_shape_exact"),
         "teacher_count_value_count_color_shape_accuracy": means.get(
             "test.full_teacher_count_value_count_color_shape_accuracy"
@@ -551,7 +747,12 @@ def main() -> None:
     parser.add_argument("--heads", type=int, default=StageAKConfig.heads)
     parser.add_argument("--steps", type=int, default=StageAKConfig.steps)
     parser.add_argument("--eval-every", type=int, default=StageAKConfig.eval_every)
+    parser.add_argument("--answer-len", type=int, default=StageAKConfig.answer_len)
     parser.add_argument("--lr", type=float, default=StageAKConfig.lr)
+    parser.add_argument("--token-loss-weight", type=float, default=StageAKConfig.token_loss_weight)
+    parser.add_argument("--process-loss-weight", type=float, default=StageAKConfig.process_loss_weight)
+    parser.add_argument("--process-state-weight", type=float, default=StageAKConfig.process_state_weight)
+    parser.add_argument("--truth-table-state-weight", type=float, default=StageAKConfig.truth_table_state_weight)
     parser.add_argument("--slot-loss-weight", type=float, default=StageAKConfig.slot_loss_weight)
     parser.add_argument("--query-loss-weight", type=float, default=StageAKConfig.query_loss_weight)
     parser.add_argument("--compare-loss-weight", type=float, default=StageAKConfig.compare_loss_weight)
@@ -575,7 +776,12 @@ def main() -> None:
             heads=args.heads,
             steps=args.steps,
             eval_every=args.eval_every,
+            answer_len=args.answer_len,
             lr=args.lr,
+            token_loss_weight=args.token_loss_weight,
+            process_loss_weight=args.process_loss_weight,
+            process_state_weight=args.process_state_weight,
+            truth_table_state_weight=args.truth_table_state_weight,
             slot_loss_weight=args.slot_loss_weight,
             query_loss_weight=args.query_loss_weight,
             compare_loss_weight=args.compare_loss_weight,

@@ -105,6 +105,28 @@ Stage AJ 不使用卷积图像 decoder：
 
 默认 seed 是 `20260701`。Stage AI 已经证明这类快速合成任务多 seed 收益很低，因此 Stage AJ 默认用单 seed 做下一步架构门禁。当前正式命令使用 `--batch-size 128`，因为 192 会在本机爆显存；GPU 低功率问题主要来自旧版 CPU/Python 评估瓶颈，已通过批量 GPU template parser、训练期小验证集和 `--torch-num-threads 1` 缓解。
 
+## P0 长训恢复基础设施
+
+Stage AJ 脚本已经切到磁盘级 checkpoint/resume 设计，长训不再只依赖内存里的 `best_state`：
+
+- `latest.pt` 保存当前训练状态，用于继续训练：model、optimizer、batch generator、PyTorch RNG、history、当前 step。
+- `best.pt` 保存最佳模型状态，用于最终评估和人工回看；它不用于继续训练，避免 resume 从 best state 接 optimizer 的错误状态。
+- 结果 JSON 使用 `schema_version=2`，并在 `run_control` 中记录 checkpoint 目录、resume 请求、设备请求、checkpoint 频率、样例频率和样例数量。
+- CLI 新增 `--checkpoint-dir`、`--resume`、`--checkpoint-every`、`--checkpoint-sample-every`、`--checkpoint-sample-count`、`--device` 和用于恢复链验证的 `--stop-after-steps`。
+- 训练中会按 step 写 checkpoint 样例 PNG 和 `samples.json`，用于在长训中途检查模型是否只学背景或出现对象发散。
+
+P0 smoke 验证路径：
+
+- `artifacts/p0_stage_aj_checkpoint_resume_smoke/partial_result.json`
+- `artifacts/p0_stage_aj_checkpoint_resume_smoke/resumed_result.json`
+- `artifacts/p0_stage_aj_checkpoint_resume_smoke/uninterrupted_result.json`
+- `artifacts/p0_stage_aj_checkpoint_resume_smoke/resume_checkpoints/memory_tree_supervised_copy/latest.pt`
+- `artifacts/p0_stage_aj_checkpoint_resume_smoke/resume_checkpoints/memory_tree_supervised_copy/best.pt`
+- `artifacts/p0_stage_aj_checkpoint_resume_smoke/resume_checkpoints/memory_tree_supervised_copy/samples/step_000002/`
+- `artifacts/p0_stage_aj_checkpoint_resume_smoke/resume_checkpoints/memory_tree_supervised_copy/samples/step_000004/`
+
+验证方式：CPU 小配置先用 `--stop-after-steps 2` 停在 step 2，再用同一 `--checkpoint-dir --resume` 续到 step 4，并跑一条不中断 step 4 对照。结果显示 resume 与不中断对照的 `nearest_scene_exact` 差值为 0，`foreground_mse` 差值为 0；`resumed_from_checkpoint=true`、`resume_step=2`、`train_steps_completed=4`。
+
 ## 中等单 seed fixed baseline 结果
 
 设备：NVIDIA GeForce RTX 4070 Laptop GPU，Torch 2.11.0+cu128。总耗时 142.149 秒，未触发时间上限。
@@ -189,7 +211,7 @@ Stage AJ 不使用卷积图像 decoder：
 
 中等 probe 也保留为快速验证记录：`supervised_copy_probe_result.json` 在 train 2048、test 256、copy 600 steps 下达到 scene exact 100%、foreground MSE 0.005730、aux scene/mask IoU 100%。正式结果把同一结论扩展到更大训练/测试规模和更大模型。
 
-## Edit/generation 辅助监督 probe 结果
+## Edit/generation 辅助监督结果
 
 运行结果：
 
@@ -221,7 +243,23 @@ Stage AJ 不使用卷积图像 decoder：
 - `00_memory_tree_supervised_edit_no_source.png` 无法可靠恢复对象和背景，符合 no-source 5.08% 的消融结果。
 - `00_text_supervised_generate.png` 能在规范背景上生成右下绿色菱形；这证明文本到 latent 到 patch decoder 的生成链路成立，但不证明随机背景可从文本生成。
 
-未完成：尝试用 d_model 192、train/test 4096/512、edit/generate 各 1500 steps 跑正式单 seed 时，命令超过 30 分钟工具超时且没有写出 JSON；残留进程已停止。因此 edit/generation 目前只按 probe 等级报告，不当作正式长训结论。
+Stage AP 已用 P0 checkpoint/resume 基础设施补完正式长训：
+
+- JSON：`artifacts/omni_transformer_stage_ap_formal_edit_generate/formal_edit_generate_result.json`
+- 样例：`artifacts/omni_transformer_stage_ap_formal_edit_generate/samples/formal_edit_generate_result/seed20260701/`
+- 报告：`docs/omni-transformer-stage-ap-formal-edit-generation-experiment.md`
+- 配置：train 4096、val 512、test 512、batch 128、d_model 192、heads 6、latent tokens 24、latent levels 6、edit/generate 各 1500 steps。
+- 设备：NVIDIA GeForce RTX 4070 Laptop GPU。
+- 总耗时：3039.263 秒，约 50.7 分钟，未触发时间预算。
+
+正式单 seed test 结果：
+
+| 模型/消融 | pixel MSE | foreground MSE | nearest scene exact | aux scene | aux mask IoU |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `memory_tree_supervised_edit` | 0.000836 | 0.005380 | 99.02% | 98.44% | 98.21% |
+| `memory_tree_supervised_edit_no_source` | - | - | 4.10% | - | - |
+| `source_image_no_edit` | - | - | 0.00% | - | - |
+| `text_supervised_generate` | 0.000073 | 0.001011 | 100.00% | 100.00% | 100.00% |
 
 ## 结论
 
@@ -230,8 +268,8 @@ Stage AJ 不使用卷积图像 decoder：
 3. 无辅助监督 copy 门禁失败：`memory_tree_copy` scene exact 只有 0.59%，foreground MSE 仍有 0.222561。
 4. copy-only 辅助监督把正式 copy 门禁打通：`memory_tree_supervised_copy` test scene exact 100%，foreground MSE 0.000794，aux 对象表和 mask 也都是 100%。
 5. 这说明当前 copy 失败不是 Transformer patch decoder 完全不能画对象，而是 latent 缺少可操作的对象约束。属性/mask 辅助监督能把对象信息压进 latent，并让完整重绘跟上。
-6. edit/generation 在 probe 规模出现强正信号：supervised edit scene exact 99.22%，no-source 只有 5.08%；text supervised generation 在规范背景上达到 100%。
-7. 这说明对象辅助监督后的 latent 不只是能 copy，还能被 edit prompt 改写，并能由完整文本提示直接生成对象图；但 edit/generation 还没有正式大模型长训结果。
+6. edit/generation 已补完正式单 seed 长训：supervised edit scene exact 99.02%，no-source 只有 4.10%，source-no-edit 为 0%；text supervised generation 在规范背景上达到 100%。
+7. 这说明对象辅助监督后的 latent 不只是能 copy，还能被 edit prompt 改写，并能由完整文本提示直接生成对象图；但这仍是低熵合成单物体任务，不证明真实照片级生成质量。
 8. 全图 pixel MSE 继续不可靠：旧 `memory_tree_edit` pixel MSE 只有 0.007041，但视觉上仍会生成模糊物体或多个物体影子。核心指标必须看 foreground/object/scene exact。
 9. 旧版训练看起来 CPU-bound 的主因是评估路径：`nearest_attrs_with_background` 曾经对每个样本循环构造 120 个候选图，而且在同一 batch 内重复解析两遍。现在已改为批量 GPU 模板匹配，并且训练中只用 `train_eval_size` 子集做 checkpoint/log。
 
@@ -239,7 +277,7 @@ Stage AJ 不使用卷积图像 decoder：
 
 1. 全图 MSE 不能作为主指标；后续必须把 foreground/object/scene exact 作为硬门禁。
 2. 纯 memory-tree residual latent 没有自然形成可靠对象表；简单继续加 token 未必解决对象化问题。Stage T/U/X 已经说明，纯 resampler 或 slot 结构容易保背景/平均纹理，却不自然形成对象 token。
-3. 辅助监督是当前最强正信号；copy 已有正式结果，edit/generation 已有 probe 结果。下一步应把 edit/generation 正式长训补完，并把对象表升级成显式可修改中间表示。
+3. 辅助监督是当前最强正信号；copy 和 edit/generation 都已有正式单 seed 结果。下一步应把对象表升级成显式可修改中间表示，并用更高熵图像任务继续挑战。
 4. 如果坚持“完整重绘”路线，copy 任务应继续作为硬门禁：源图完整重绘必须先过 foreground scene exact，再测试 edit prompt 修改能力。
 5. patch size 可以从 8 降到 4 测一次，但必须和当前 supervised copy 对照；否则容易把更多 patch token 带来的成本误判为架构进步。
-6. 这个脚本仍没有 checkpoint 和断点恢复；更长训练前应补中间样例、checkpoint、恢复和失败保护。
+6. checkpoint/resume 已补到 Stage AJ 脚本；更长训练前仍要把 `--checkpoint-dir` 放在空间充足的磁盘上，并保留 P0 smoke 的 interrupted/resume/uninterrupted 三段验证方式。

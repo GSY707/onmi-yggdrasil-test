@@ -16,16 +16,18 @@
 已经比较强的正信号：
 
 - Stage AM：结构化 evidence 上，cell/count/pair 统一 latent bus + count 输入专家 + decoded position compare 后，四任务 all-task answer 达到 98.24%。
+- Stage AN：同一统一 bus 接 answer-token writer 后，3 seed 平均 answer-token sequence exact 达到 98.11%，证明统一 bus 不只支撑分类头。
+- Stage AQ：加入 relation delta 与 deterministic truth-table 过程状态，并把 truth-table state 强注入 answer writer 后，3 seed relation sequence exact 达到 99.74%，no-evidence relation truth-table 为 50.52%。
 - Stage AK/AL：relation-only 的 object/pair latent bus、query retrieval、compare 和 yes/no answer writer 已接近 99%-100%。
-- Stage AJ：Transformer patch 输入到 latent 再完整重绘的链路能跑；copy-only 辅助监督正式单 seed 达到 100% scene exact；edit/generation probe 达到强正信号。
+- Stage AJ/AP：Transformer patch 输入到 latent 再完整重绘的链路能跑；copy-only 辅助监督正式单 seed 达到 100% scene exact；edit/generation 正式单 seed 达到 99.02%/100% scene exact。
 - Stage E/F/I/J/K：多模态 shared latent、工具历史、memory、UI/DOM 和 audit loop 在合成环境中可以闭合。
 
 仍然没有证明的部分：
 
 - Stage AM 还只是结构化合成 evidence，不证明真实视觉计数或 detector/segmentation 到 count slots。
-- Stage AM 仍是分类/选择式 answer writer，不是 Stage AC 那类 answer-token latent writer。
-- Stage AM relation 只有 92.97%，没有回到 Stage AL 的 99.61%。
-- Stage AJ edit/generation 仍是 probe，没有正式长训、checkpoint、恢复和多 seed。
+- Stage AM 已由 Stage AN 补上 answer-token writer 门禁，但仍是结构化 evidence，不证明真实语言生成能力。
+- Stage AM relation 只有 92.97%，Stage AN 为 92.45%；Stage AQ 已拉到 99.74%，但依赖显式 deterministic truth-table 结构偏置。
+- Stage AP 已补完 Stage AJ edit/generation 正式单 seed 长训；仍未完成 edit/generation 的多 seed 统计和更高熵图像任务。
 - 当前没有真实文件、真实 UI 页面、真实 OCR/layout、长程探索成本、局部记忆污染和工具失败恢复的综合挑战。
 
 ## 总原则
@@ -53,12 +55,28 @@
 | P2 | Stage AT：长程局部记忆和探索成本 | memory tree/work tree 是否真的降低长任务成本 | 局部地图、遮挡、错误探测、不可重置探测成本、多目标任务，要求写 memory 并复用 | 同等预算下 memory/active-read 明显优于 no-memory；错误记忆注入后可检测或修正 | 如果只是短 horizon 100%，继续加路径长度、干扰和错误观察，不算通过 |
 | P3 | Stage AU：预训练专家 + hard negative grounding | 真实专家接入后，latent bus 是否承载视觉/文档 grounding | DocVQA/OCR/layout/CLIP 或小型 VLM expert，加入同 prompt 风格但图像事实不同的 hard negatives | full 明显高于 text-only/CLIP-only；no-image 和 shuffled-image 必须掉分 | 如果 text-only 接近 full，任务不是 grounding 测试，重做数据集 |
 
+## P0 落地状态
+
+2026-07-04 已先在 Stage AJ 图像 IO 长训脚本落地 P0 基础设施：磁盘级 `latest.pt`/`best.pt`、`--resume`、训练中样例、`schema_version=2` 的结果 JSON、CPU/GPU 设备选择、时间预算跳过保护和 `--stop-after-steps` 恢复链故障注入。验证记录见 `docs/omni-transformer-stage-aj-transformer-image-io-fidelity-experiment.md` 的 P0 小节。
+
+后续 Stage AN/AO/AP/AQ 不应重新发明一套恢复格式；如果需要长训，应复用这套字段口径：latest 用于继续训练，best 只用于最终评估，结果 JSON 必须记录 checkpoint 目录、resume 状态、设备、seed、best checkpoint、训练步数和是否因时间/测试注入停止。
+
+## P1 已完成状态
+
+2026-07-04 已完成 Stage AN、Stage AP 与 Stage AQ：
+
+- Stage AN：`docs/omni-transformer-stage-an-answer-token-latent-writer-prep.md`，正式结果 `artifacts/omni_transformer_stage_an_answer_token_writer/formal_results.json`，answer-token sequence exact 98.11%，relation sequence exact 92.45%。
+- Stage AP：`docs/omni-transformer-stage-ap-formal-edit-generation-experiment.md`，正式结果 `artifacts/omni_transformer_stage_ap_formal_edit_generate/formal_edit_generate_result.json`，edit scene exact 99.02%，edit no-source 4.10%，text generation scene exact 100%。
+- Stage AQ：`docs/omni-transformer-stage-aq-relation-process-supervision-experiment.md`，正式通过结果 `artifacts/omni_transformer_stage_aq_relation_process_supervision/formal_results_v3.json`，relation sequence exact 99.74%，relation truth-table 100%，no-evidence relation truth-table 50.52%。
+
+Stage AQ 的关键经验是：只加 learned truth-table head 不够；deterministic truth-table 可读但弱注入仍不够；必须把 truth-table state 作为强过程状态接入 answer writer。
+
 ## 推荐执行顺序
 
-1. 先做 P0。没有 checkpoint/resume 和统一证据 schema，后续长训会继续被工具超时和残留进程拖住。
-2. 同步做 Stage AN 和 Stage AQ。它们复用 Stage AM 代码路径，能最快判断“统一 bus”是否能升级成更真实的输出与 relation 过程。
-3. 再做 Stage AP。图像输出路线已有强正信号，但正式 edit/generation 不能继续停留在 probe。
-4. 然后做 Stage AO。它会把 Stage AM 从结构化 evidence 推到像素 expert，这才是真正挑战 cell/count slots 的下一步。
+1. P0 已先在 Stage AJ 落地；后续长训脚本要复用同一恢复与结果 schema。
+2. Stage AN 和 Stage AQ 已完成；继续维护它们作为 Stage AM 代码路径的统一 bus / token writer / relation process 基线。
+3. Stage AP 已完成正式单 seed；图像输出路线下一步应转向多 seed 或更高熵图像任务。
+4. 然后做 Stage AO。它会把 Stage AM/AQ 从结构化 evidence 推到像素 expert，这才是真正挑战 cell/count/pair slots 的下一步。
 5. P2/P3 作为第二轮扩展，不要和 P1 混成一个超大实验。跨专家、真实文件、长程记忆、预训练专家各自都有不同失败点，必须分开归因。
 
 ## 旧路线收口规则
