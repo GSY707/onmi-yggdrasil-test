@@ -59,6 +59,9 @@ Stage AJ 把任务改得更接近未来图像编辑：整张源图先切成 patc
 - 记忆树口径是可实现的：节点保存摘要、URI 引用和关系边，原始高熵 payload 会被拒绝。
 - 变长专家输出可以被聚合进统一 token 序列：`CrossAttentionPump` 能按路由权重处理不同长度的专家输出。
 - Stage E+F 证明了一个小型多模态任务中，图像、文本、遥测可以汇入 shared latent bus，并从中读出正确答案。
+- Stage AK 证明了先训练统一 object/pair latent bus 后，relation 任务里的对象检索和位置比较可以同时闭合：pair row/col、left/right retrieval、relation compare 都达到约 99%-100%。
+- Stage AL 进一步证明硬化后的统一潜空间可以接入答案输出头：model-selected answer 达到 99.61%，no-evidence answer 约 60.35%。
+- Stage AM 把难度拉回 color/shape/count/relation 四任务后，证明 cell/count slots 必须成为一等 latent bus：加入 count 输入专家和 decoded position compare 后，四任务 model answer 达到 98.24%，count/color/shape 均 100%，relation 为 92.97%，no-evidence answer 为 27.54%。
 - Stage AI 证明了低熵图像生成/编辑链路能闭合。
 - Stage AJ 证明了 Transformer patch decoder 加对象/mask 辅助监督后，可以从 latent 完整重绘合成对象图，并在 probe 规模完成源图编辑。
 

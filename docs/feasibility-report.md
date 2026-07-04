@@ -18,7 +18,7 @@
 
 ## 结论
 
-整体结论：白皮书里的工程方向有可落地的接口骨架，最适合作为 `世界树计划` 现有工作树、记忆树、Fork runtime 的下一层实验分支；但其中“潜空间自我对齐”“真实多模态推理主导权转移”“provider KV Cache 物理剪枝”还没有被本轮验证证明，需要真实模型、服务端 KV API 或训练实验。Stage Y 到 AJ 的新结论进一步收窄了路线：输入专家应并行直读外部信息，显式监督和 token/text 对齐都有正信号；Q/A 与外部信息互译可以做到高保真，但普通 latent reasoner 不能自动完成答案 token 潜空间推理。只调 latent reasoner、加入显式 readout/trace 后有强正信号；主动读取 agent 后证据依赖性更强，但 query policy 尤其是 relation 的左右对象查询还没有闭合。MoE gate 可以学会任务族路由，但 naive 分阶段训练会灾难性遗忘，replay 只能部分缓解。Teacher-forced multi-step query trace 在四任务上打开了正确读取后的上限；逐项消融进一步说明 process supervision 能修正确读取后的 compare 上限，朴素 CLIP-style query alignment 只能小幅改善 query，且容易破坏 evidence reader。Stage AI 把验证切到图像输出专家后很快饱和，只能证明低熵图像生成/编辑链路能闭合；Stage AJ 改成全 Transformer patch 输入、latent 和 patch decoder 后，无辅助监督 memory-tree 仍丢对象，但对象属性/mask 辅助监督能把合成源图完整重绘打到 100%，并在 probe 规模把编辑推到 99.22%、规范背景文本生成推到 100%。编辑/生成仍需正式长训和更复杂数据验证。
+整体结论：白皮书里的工程方向有可落地的接口骨架，最适合作为 `世界树计划` 现有工作树、记忆树、Fork runtime 的下一层实验分支；但其中“潜空间自我对齐”“真实多模态推理主导权转移”“provider KV Cache 物理剪枝”还没有被本轮验证证明，需要真实模型、服务端 KV API 或训练实验。Stage Y 到 AM 的新结论进一步收窄了路线：输入专家应并行直读外部信息，显式监督和 token/text 对齐都有正信号；Q/A 与外部信息互译可以做到高保真，但普通 latent reasoner 不能自动完成答案 token 潜空间推理。只调 latent reasoner、加入显式 readout/trace 后有强正信号；主动读取 agent 后证据依赖性更强，但 query policy 尤其是 relation 的左右对象查询还没有闭合。MoE gate 可以学会任务族路由，但 naive 分阶段训练会灾难性遗忘，replay 只能部分缓解。Teacher-forced multi-step query trace 在四任务上打开了正确读取后的上限；逐项消融进一步说明 process supervision 能修正确读取后的 compare 上限，朴素 CLIP-style query alignment 只能小幅改善 query，且容易破坏 evidence reader。Stage AK 把统一 object/pair latent bus 前置后，relation 的 pair readout、text query retrieval 和 compare 同时达到约 99%-100%；Stage AL 再接 answer writer 后 model-selected answer 达到 99.61%；Stage AM 把任务拉回 color/shape/count/relation 四任务后，证明 cell/count slots 必须作为一等 latent bus，加入 count 输入专家和 decoded position compare 后 all-task model answer 达到 98.24%。这支持“先把潜空间练硬，再接 reasoner/输出头”的路线。Stage AI 把验证切到图像输出专家后很快饱和，只能证明低熵图像生成/编辑链路能闭合；Stage AJ 改成全 Transformer patch 输入、latent 和 patch decoder 后，无辅助监督 memory-tree 仍丢对象，但对象属性/mask 辅助监督能把合成源图完整重绘打到 100%，并在 probe 规模把编辑推到 99.22%、规范背景文本生成推到 100%。编辑/生成仍需正式长训和更复杂数据验证。
 
 | 命题 | 本轮结果 | 证据 |
 | --- | --- | --- |
@@ -66,6 +66,9 @@
 | Stage AF MoE 推理专家与分任务阶段训练 | MoE gate 能被监督到 100%，但没有自动修复 query policy；naive staged 严重遗忘，staged+replay 有缓解但低于 mixed/AE/AD | 1 seed：staged full 13.09%，gate 25%，前三任务 0%；mixed MoE full 69.34%，gate 100%；staged+replay full 64.45%，gate 100%；relation-only MoE full 53.12%，no-evidence 61.33%，left/right pair query 35.94%/30.08% |
 | Stage AG Teacher-forced multi-step query trace | 暂停 MoE 是正确方向；teacher-forced query 在四任务上显著打开上限，但自由 query 仍弱，relation-only 仍未被正确 query 解开 | 1 seed：四任务 full 58.79%，no 16.80%，shuffled 21.29%，teacher-forced queries 83.59%；relation-only full 59.77%，no 60.55%，teacher-forced queries 59.77%；pair reader row/col 约 96%-97% |
 | Stage AH Query alignment 与 process supervision 消融 | Process supervision 修了正确读取后的 compare 上限；朴素 CLIP-style query alignment 只小幅修 query，且会破坏 reader；detached-key 能保住 reader 但 query 改善不足 | 1 seed：relation query-only left/right 46.48%/47.27% 但 pair reader row/col 38.72%/34.74%；process-only teacher-forced 66.80%，row/col forced 100%；四任务 process-only full 62.70%，teacher-forced 84.18% |
+| Stage AK 统一潜空间硬化 | 先定义并训练统一 object/pair latent bus 后，relation 的对象检索和位置比较同时闭合；这支持“潜空间未统一”是 Stage AE-AH 的主因之一 | 1 seed：pair occupancy exact 99.22%，pair row/col 100%/100%，left/right retrieval 100%/100%，teacher/model compare 99.61%；no-evidence compare 60.55% |
+| Stage AL 统一潜空间接答案输出头 | 硬化后的统一 object/pair latent bus 可以直接支撑答案输出；最小链路 `bus -> retrieval -> compare -> answer` 闭合 | 1 seed：pair row/col 100%/100%，left/right retrieval 100%/100%，teacher/model compare 99.61%，teacher/model answer 99.61%，no-evidence answer 60.35% |
+| Stage AM 历史最高难度统一 bus | 四任务混训时，cell/count 必须是一等 slot；count 不能靠普通 attention 自然学出，需要 count 输入专家或等价计数归纳偏置；relation compare 应读 decoded position state | 1 seed all-task：model answer 98.24%，color/shape/count answer 100%，relation answer 92.97%，count table exact 100%，no-evidence answer 27.54%；count-only：count table、selected count、answer 均 100% |
 | Stage AI 图像生成与源图编辑输出专家 | 低熵合成图像生成/编辑链路可闭合，但正式 sweep 已饱和，不能继续区分 direct、latent output 或编辑架构强弱 | 3 seeds：prompt_direct、latent_output、latent_image_edit 的 nearest/head scene exact 均 100%；no-source nearest scene exact 3.42%，source-no-edit 0%；平均总耗时 250.092 秒，未触发 36 小时时间上限 |
 | Stage AJ Transformer 图像 IO 保真 | 全 Transformer patch 输入到 latent 再 patch decoder 完整重绘的链路可跑通；无辅助监督 memory-tree 有源图依赖但 copy 失败；对象属性/mask 辅助监督闭合 copy，并在 probe 规模打开 edit/generation | fixed baseline：transformer_edit scene exact 3.12%、transformer_copy 0%；无辅助 memory-tree：edit 11.91%、copy 0.59%；supervised copy formal：scene exact 100%、foreground MSE 0.000794；supervised edit/generate probe：edit 99.22%、edit no-source 5.08%、text generate 100% |
 
@@ -165,6 +168,15 @@ Fork 的父上下文锚点和 child 执行焦点可以映射到“逻辑树索�
 - Stage AH 的朴素 CLIP-style query alignment 有副作用：left/right query 从约 35%/45% 提到 46.48%/47.27%，但 pair reader row/col 掉到 38.72%/34.74%，说明 query-object 对齐会破坏 evidence token 可读性。
 - Stage AH detached-key query alignment 保住 reader row/col 到 98.40%/96.15%，但 query 只有 39.06%/41.80%。所以“冻结 evidence tower，只训 query tower”方向更安全，但当前训练信号仍不够强。
 - Stage AH combined 没有叠加收益：teacher-forced 只有 59.77%，说明 query alignment、reader loss、process loss 的梯度目标互相牵制。下一步应改成分阶段预训练，而不是同时加权。
+- Stage AK 按“先把潜空间练硬”的思路，先训练统一 pair/object latent bus，不接最终 answer decoder。结果 pair slot row/col、left/right query retrieval、relation op 和 model selected compare 全部达到约 99%-100%。
+- Stage AK 的 no-evidence 诊断也符合预期：left/right retrieval 仍为 100%，因为问题文本本身包含对象 color-shape；但 row/col 回到约 25% 随机附近，compare 只有 60.55%。这说明 full compare 的 99.61% 来自 evidence latent 中的位置事实。
+- Stage AK 说明 Stage AE-AH 的主要失败不必先归因到架构错误；更可能是潜空间一开始没有统一，后期补 loss 把多个局部 latent 空间硬接在一起。
+- Stage AL 在同一个统一 bus 上接最小 answer writer，model-selected answer 达到 99.61%，与 compare 99.61% 对齐。no-evidence answer 只有 60.35%，说明输出头确实依赖 evidence slot 中的位置事实。
+- Stage AL 的结论是阶段性的：它不是完整 answer-token decoder，也不是四任务 reasoner；但已经证明硬潜空间可以支撑 `query -> observe/select -> compare -> answer` 的最小输出链。
+- Stage AM 把任务拉回 `color_at_cell`、`shape_at_cell`、`count_color_shape`、`relation_yes_no` 四任务。只把 count head 接在 pair slots 上时，count answer 只有 42.19%；独立 count slots 但仍用 softmax attention 时，count answer 约 54%-56%；additive/sigmoid count 聚合也失败。这说明 count slot 需要一等 count 输入专家或等价计数归纳偏置。
+- Stage AM 的 count 输入专家闭合了 count-only：count table exact、selected count value 和 count answer 都达到 100%，no-evidence count answer 只有 9.57%。这验证了“cell/count slots 没做硬会挂”这个担忧。
+- Stage AM 最终 all-task 在单 seed 上达到 model answer 98.24%，color/shape/count answer 均 100%，relation answer 92.97%，count table exact 100%，no-evidence answer 27.54%。relation 一开始只有约 80%，把 compare context 从 raw pair slot 改为 decoded row/col position state 后升到 92.97%。
+- Stage AM 的边界也很明确：当前 count 输入专家利用的是结构化 evidence 中的 one-hot color/shape，不证明真实图像计数；真实任务需要 detector/segmentation/counting expert 先产生同等质量的 count slots。
 - Stage AI 证明了低熵图像输出链路能闭合，但正式 sweep 已经饱和：prompt direct、latent output、latent image edit 都达到 100% scene exact。因此它不能再证明 latent 输出专家更优，也不能外推到真实图像生成能力。
 - Stage AI 的 no-source/source-no-edit 消融仍有效：no-source 只有 3.42%，source-no-edit 为 0%，说明源图编辑不是简单猜测或复制。但任务仍只是 64x64 单物体合成图，不含自然图像、多对象、遮挡、局部 mask、风格迁移或扩散采样。
 - Stage AJ 更贴近“整图输入 -> latent -> 完整重绘”，fixed baseline 结果是负的：Transformer patch decoder 可以学到背景纹理，foreground/object 保真失败；`transformer_edit` scene exact 只有 3.12%，`transformer_copy` 为 0%。
@@ -199,9 +211,9 @@ Fork 的父上下文锚点和 child 执行焦点可以映射到“逻辑树索�
 18. Stage AC/AD/AE 之后，第三步必须单独设计训练目标：target cell token、selected object token、count accumulator、relation pair token 等中间 latent 操作应被显式监督。
 19. Stage AC/AD/AE 之后，evidence latent 不能只要求“decoder 能读出事实”；它还必须对 reasoner 可操作，例如固定 cell/object/count-pair token 坐标、可检索对象表或可微 lookup 结构。Stage AD/AE 已证明 reasoner 内部 readout/queryable reader 是正向路径，但 selector 和 query policy 还没严格对齐。
 20. Stage AC/AD/AE 之后，answer-token latent 需要离散分离或 token-level contrastive 约束；只用 MSE/cosine 靠近答案 latent 会产生高 cosine、低 exact 的假成功。
-21. Stage AH 之后，不应继续优先做 MoE；先把 query policy 和 compare trace 训练扎实，再考虑专家路由。
-22. Stage AH 之后，relation compare 应继续加强 truth-table / delta / op 的直接监督；process supervision 已有正信号，但 delta row/col 仍低。
-23. Stage AH 之后，CLIP-style query alignment 应分阶段做：冻结 evidence codec/pair reader，先把 query retrieval 训到 90%+，再接 answer writer；不要把 retrieval loss、reader loss、process loss 一起混训。
+21. Stage AM 之后，不应继续优先做 MoE；先把统一 latent bus 接回 Stage AC 的 answer-token latent writer，验证分类答案头能否升级到文本 answer token latent。
+22. Stage AM 已验证 cell/count slots 必须一等化；下一步应把当前结构化 count 输入专家替换成可训练的 detector/segmentation/counting expert，再测真实或更高熵视觉任务。
+23. Stage AM 之后，relation 还没回到 Stage AL 的 99.61%；下一步应加入 relation truth-table/delta slots 或更硬的 process supervision，而不是只加 compare loss 权重。
 24. Stage AF 之后，若继续 staged 训练，必须有 replay buffer、蒸馏、正则化或冻结策略；不要再做单向无 replay 的阶段训练。
 25. Stage AC/AD/AE/AF/AG 下一轮应加入 direct structured baseline，确认任务本身和训练预算不是瓶颈。
 26. DocVQA 下一步应接入预训练专家：OCR/text/layout encoder 或现有 VLM，把高分辨率文档理解交给专家，再测试 latent bus 与 agent decoder。
