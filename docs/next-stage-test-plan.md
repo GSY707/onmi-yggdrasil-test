@@ -71,13 +71,40 @@
 
 Stage AQ 的关键经验是：只加 learned truth-table head 不够；deterministic truth-table 可读但弱注入仍不够；必须把 truth-table state 作为强过程状态接入 answer writer。
 
+## P2 已启动状态
+
+2026-07-04 已完成 Stage AR 视觉中心跨专家不可单解任务：
+
+- Stage AR：`docs/omni-transformer-stage-ar-cross-expert-visual-experiment.md`，正式结果 `artifacts/omni_transformer_stage_ar_cross_expert_visual/formal_results.json`。
+- 3 seed 平均 latent full answer accuracy 为 100.00%，no-image / no-text-rule / no-telemetry / no-memory 消融分别降到 23.96% / 25.07% / 32.10% / 30.21%。
+- direct all-input baseline 为 51.04%，没有同等解决。
+
+Stage AR 的结论只覆盖受控合成视觉 + 受控 DSL text-rule + 离散 telemetry/memory 的四路因果依赖；不证明真实 VLM grounding、自然语言指令跟随或长程 agent 状态。agent 状态路线保留给 Stage AT 或 AR 后续加强版。
+
+2026-07-04 已完成 Stage AS 真实文件证据审计：
+
+- Stage AS：`docs/omni-transformer-stage-as-file-audit-experiment.md`，正式结果 `artifacts/omni_transformer_stage_as_file_audit/formal_results.json`。
+- 3 seed 平均 conclusion accuracy、citation accuracy、report exact、tool step legality 均为 100.00%。
+- no-tool-history conclusion accuracy 为 25.00%，相对 full 下降 75.00 个百分点。
+
+Stage AS 的结论覆盖真实落盘 HTML/CSV/PDF/截图文件和受控工具读取链路；不证明复杂 PDF layout、OCR、开放网页审计或自由规划型 tool-use agent。
+
+2026-07-04 已完成 Stage AT 长程局部记忆和探索成本任务：
+
+- Stage AT：`docs/omni-transformer-stage-at-memory-exploration-experiment.md`，正式结果 `artifacts/omni_transformer_stage_at_memory_exploration/formal_results.json`。
+- 3 seed 平均 episode success 为 100.00%，强 no-memory oracle episode success 为 0.00%，success gap 为 100.00 个百分点。
+- full mean scans 为 4.00，no-memory oracle mean scans 为 10.00；full mean cost 为 38.00，no-memory oracle mean cost 为 47.96。
+- corrupt-memory success 为 99.93%，corrupt-memory correction rate 为 99.80%。
+
+Stage AT 的结论覆盖受控局部地图、遮挡 zone、主动 scan/write memory、多目标复用和错误 memory 修正；不证明真实导航、真实视觉 SLAM、开放式 memory tree 自动扩展或自由规划型长期 agent。
+
 ## 推荐执行顺序
 
 1. P0 已先在 Stage AJ 落地；后续长训脚本要复用同一恢复与结果 schema。
 2. Stage AN 和 Stage AQ 已完成；继续维护它们作为 Stage AM 代码路径的统一 bus / token writer / relation process 基线。
 3. Stage AP 已完成正式单 seed；图像输出路线下一步应转向多 seed 或更高熵图像任务。
-4. 然后做 Stage AO。它会把 Stage AM/AQ 从结构化 evidence 推到像素 expert，这才是真正挑战 cell/count/pair slots 的下一步。
-5. P2/P3 作为第二轮扩展，不要和 P1 混成一个超大实验。跨专家、真实文件、长程记忆、预训练专家各自都有不同失败点，必须分开归因。
+4. Stage AO 已完成后，Stage AR 已先验证视觉中心四路专家因果依赖，Stage AS 已验证小型真实文件边界和引用审计链路，Stage AT 已验证受控长程局部记忆的探索成本收益。
+5. P2 的 AR/AS/AT 不要混成一个超大实验。跨专家、真实文件、长程记忆、预训练专家各自都有不同失败点，必须分开归因。
 
 ## 旧路线收口规则
 
