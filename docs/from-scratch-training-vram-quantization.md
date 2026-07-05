@@ -4,6 +4,10 @@
 
 如果目标是“完整从 0 训练，但只验证架构闭环，不要求完成真实任务质量”，量化可以再省一些，但省法和推理量化不一样。
 
+2026-07-04 新增本机实测：RTX 4070 Laptop 8GB 可以运行 Stage AV 的 70,994,707 参数从零集成 Micro-Omni probe，配置为 `d_model=768`、`layers=10`、`heads=12`、`latent_tokens=8`、`batch_size=32`、AMP，1000 step 约 92 秒，峰值 CUDA allocated 约 1,810.62 MB。这个结果证明“70M 级架构验证模型”在本机可训练，但 probe 未通过正式能力门槛：overall 64.32%，视觉子任务 23.44%，说明显存可承受不等于架构闭合。
+
+同日 Stage AV-B 已切到分阶段潜空间训练方案。70M batch 256 smoke 参数量为 71,025,455，峰值 CUDA allocated 约 3,094.87 MB；因此 8GB 本机长训建议从 batch 256 启动，若功耗长期低于 60W，再试 batch 384/512。功耗以 `nvidia-smi -l 2` 实测为准。
+
 推荐口径：
 
 | 显存 | 量化/省显存后能做什么 | 判断 |

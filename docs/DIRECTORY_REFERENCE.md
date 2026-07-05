@@ -11,6 +11,7 @@
 | --- | --- |
 | `README.md` | 项目简短介绍、近期图像生成/编辑成果、Stage E+F 多模态融合成功结果、目标路线、初步证明和最小验证入口 |
 | `docs/experiment-general-lessons.md` | 当前实验按任务线沉淀出的失败、修复和通用规则，覆盖统一 latent bus、专家分工、输出头、图像保真、长训恢复和旧路线收口 |
+| `docs/omni-latent-reasoning-route-and-goals.md` | 2026-07-06 AV 线正确路线回收：先打通 `external <-> latent workspace <-> latent reasoning <-> external`，把自构造图像和 teacher 作为外设监督源，建议下一步 Stage AV-J |
 | `docs/from-scratch-training-vram-quantization.md` | 从 0 训练完整架构验证的显存、量化、省显存边界和最低价整机购卡建议 |
 | `pyproject.toml` | Python 测试配置、pytest 可选依赖、DocVQA 数据读取可选依赖与预训练/LLaVA 实验依赖 |
 | `.gitignore` | 忽略本地虚拟环境、pytest 缓存、大模型 checkpoint 和本地 HF token 文件 |
@@ -55,6 +56,15 @@
 | `experiments/omni_transformer_stage_ar_cross_expert_visual.py` | Stage AR 视觉中心跨专家不可单解任务：image、text rule、telemetry、memory 四路输入共同决定答案，含 no-modality 消融、direct baseline、样例 PNG 与 sweep 聚合 |
 | `experiments/omni_transformer_stage_as_file_audit.py` | Stage AS 真实文件证据审计实验：生成 HTML/CSV/PDF/截图文件，通过受控工具读取证据，输出 audit conclusion、citation pattern、tool legality 与 no-tool-history 消融 |
 | `experiments/omni_transformer_stage_at_memory_exploration.py` | Stage AT 长程局部记忆和探索成本实验：局部遮挡地图、主动 scan/write memory、多目标复用、强 no-memory oracle 对照和错误 memory 修正 |
+| `experiments/omni_transformer_stage_av_from_scratch_micro_omni.py` | Stage AV 70M 从零集成 Micro-Omni 实验：单一 Transformer 接 image/text/tool/memory/state，覆盖 AR/AS/AT 子任务、容量 smoke、probe 和消融 |
+| `experiments/omni_transformer_stage_avb_staged_latent_training.py` | Stage AV-B 分阶段潜空间训练实验：text base、image translator、tool/memory translator、latent reasoner、joint tuning，GPU 常驻数据、AMP、checkpoint/resume 和 batch smoke |
+| `experiments/omni_transformer_stage_avc_dataset_pipeline.py` | Stage AV-C 大规模合成数据流水线：生成 train/val/test/heldout sharded `.pt` 数据集、manifest、token 规模估算和任务分布统计 |
+| `experiments/omni_transformer_stage_ave_bidirectional_latent_external.py` | Stage AV-E 潜变量与外部表征双向互译实验：source/target external、latent edit、source->target、target->source、reconstruction、answer 和 heldout probe |
+| `experiments/omni_transformer_stage_avf_10m_bidirectional_dataset.py` | Stage AV-F 10M 级双向互译数据集生成器：按 AV-D 1B-first 设计定向裁剪 source/target external pairs，输出 AV-E 可读 manifest 和 tensor shards |
+| `experiments/omni_transformer_stage_avg_strict_staged_10m_training.py` | Stage AV-G 严格分阶段 10M 训练入口：text latent base、external codec、bidirectional translation、latent reason 和 short joint debug，输出独立 AV-G checkpoint |
+| `experiments/omni_transformer_stage_avh_text_anchored_visual_edit_dataset.py` | Stage AV-H 文本锚定视觉编辑数据集生成器：source text/source image/edit instruction 到 target text/target record/target image，训练时由 record 渲染图像 |
+| `experiments/omni_transformer_stage_avh_text_anchored_visual_edit_training.py` | Stage AV-H 10M 训练入口：text latent、image grounding、edit reason、image output、joint debug 五阶段训练，含 68M 配置、AMP、GPU 常驻数据、micro-batch 累积、Adafactor/AdamW 开关和 checkpoint/resume |
+| `experiments/omni_transformer_stage_avi_whole_image_latent_capacity.py` | Stage AV-I 整图 latent token 容量诊断：不切 patch，整图 encoder 到 latent token bank，透明背景 RGBA 重建，ordered prefix 按短到长 curriculum 解锁，支持拆分 `latent_dim`、`encoder_width`、`decoder_width`，并用 schema v5 correct-pixel compact guidance 与 residual routing 约束前序正确像素、错误像素惩罚和后续 token 残差分工 |
 | `src/latent_space_agent_feasibility/` | 纯 Python 原型，实现 LOD、注意力泵、主动采样、记忆树节点/关联边、KV 分支剪枝、离线对齐与渐进式生成计划 |
 | `tests/` | 可运行验证用例，覆盖白皮书核心命题的接口和不变量 |
 | `tests/test_stage_aj_checkpointing.py` | Stage AJ P0 checkpoint/resume 辅助逻辑测试，覆盖 runtime 控制参数兼容和显式 CPU 设备选择 |
@@ -235,6 +245,87 @@
 | `artifacts/omni_transformer_stage_at_memory_exploration/probe_v8_results.json` | Stage AT 首轮主动建图策略的单 seed probe 结果；full success 100%，no-memory oracle success 0%，scan 4 vs 10 |
 | `artifacts/omni_transformer_stage_at_memory_exploration/formal_results.json` | Stage AT 正式 3 seed 聚合结果；episode success 100%，no-memory oracle 0%，scan reduction 6.00，cost reduction 9.96，corrupt-memory correction 99.80% |
 | `artifacts/omni_transformer_stage_at_memory_exploration/formal_runs/` | Stage AT 正式训练每个 seed 明细 JSON、训练轨迹、rollout 指标、样例局部地图 PNG 和 memory/no-memory/corrupt trace |
+| `artifacts/omni_transformer_stage_av_from_scratch_micro_omni/smoke_results.json` | Stage AV 小模型 smoke 聚合结果，用于验证脚本、训练循环、样例 PNG 和 JSON 输出链路 |
+| `artifacts/omni_transformer_stage_av_from_scratch_micro_omni/larger_smoke_results.json` | Stage AV 70M 容量 smoke 结果；参数量 70,994,707，RTX 4070 Laptop 8GB 上峰值 CUDA allocated 约 1,375 MB |
+| `artifacts/omni_transformer_stage_av_from_scratch_micro_omni/probe_70m_residual_results.json` | Stage AV 70M residual evidence readout probe 结果；overall 64.32%，memory 100%，file-tool 69.53%，visual 23.44%，未过正式门槛 |
+| `artifacts/omni_transformer_stage_av_from_scratch_micro_omni/probe_70m_residual_runs/` | Stage AV 70M probe 每 seed 明细 JSON、训练轨迹、样例 PNG 和 samples.json |
+| `artifacts/omni_transformer_stage_avb_staged_latent_training/smoke_result.json` | Stage AV-B 小模型 smoke 结果，用于验证分阶段训练、checkpoint、样例和 JSON 输出链路 |
+| `artifacts/omni_transformer_stage_avb_staged_latent_training/large_smoke_result.json` | Stage AV-B 70M smoke 结果；参数量 71,025,455，峰值 CUDA allocated 约 1,505 MB |
+| `artifacts/omni_transformer_stage_avb_staged_latent_training/large_batch128_smoke_result.json` | Stage AV-B 70M batch 128 smoke 结果；峰值 CUDA allocated 约 2,184 MB |
+| `artifacts/omni_transformer_stage_avb_staged_latent_training/large_batch256_smoke_result.json` | Stage AV-B 70M batch 256 smoke 结果；峰值 CUDA allocated 约 3,095 MB，用于长训 batch 起点 |
+| `artifacts/omni_transformer_stage_avb_staged_latent_training/long_result.json` | Stage AV-B 用户本地 long probe 结果；overall 74.61%，tool 95.01%，memory 100%，visual 28.95%，no-image/shuffled-image 不降，未过门槛 |
+| `artifacts/omni_transformer_stage_avb_staged_latent_training/*_checkpoints/` | Stage AV-B smoke checkpoint 目录，验证 `latest.pt` 写入与 `--resume` 路径 |
+| `artifacts/omni_transformer_stage_avc_dataset_pipeline/smoke_dataset/manifest.json` | Stage AV-C sharded dataset smoke manifest；1,408 examples、88,704 tokens、train/val/test/heldout split 和任务分布 |
+| `artifacts/omni_transformer_stage_avc_dataset_pipeline/smoke_dataset/` | Stage AV-C 小规模 sharded 数据集 smoke，包含 `.pt` shard、tokens/answers/tasks tensor 和 heldout split |
+| `artifacts/omni_transformer_stage_ave_bidirectional_latent_external/smoke_results.json` | Stage AV-E 双向互译 smoke 聚合结果，用于验证 source/target external、latent edit、heldout、PNG 样例和 JSON 输出链路 |
+| `artifacts/omni_transformer_stage_ave_bidirectional_latent_external/probe_results.json` | Stage AV-E 小 probe 聚合结果；source-to-target token accuracy 28.40%，target-to-source 28.24%，answer 接近随机，未过门槛 |
+| `artifacts/omni_transformer_stage_ave_bidirectional_latent_external/probe_runs/` | Stage AV-E probe 每 seed 明细 JSON、训练轨迹、source/target PNG 和 samples.json |
+| `artifacts/omni_transformer_stage_ave_bidirectional_latent_external/manifest_smoke_gpu_result.json` | Stage AV-E 读取 AV-F smoke manifest 的 CUDA smoke 结果，验证 manifest 训练入口、checkpoint 和 batched eval |
+| `artifacts/omni_transformer_stage_ave_bidirectional_latent_external/dataset10m_loader_smoke_gpu_result.json` | Stage AV-E 读取 AV-F 10M manifest 的 CUDA loader smoke 结果，验证完整 train 分片可读 |
+| `artifacts/omni_transformer_stage_ave_bidirectional_latent_external/dataset10m_70m_capacity_smoke_result.json` | Stage AV-E 70M batch 256 capacity smoke；75,970,770 参数，峰值 CUDA allocated 约 4,753.32 MB |
+| `artifacts/omni_transformer_stage_ave_bidirectional_latent_external/dataset10m_70m_batch512_capacity_smoke_result.json` | Stage AV-E 70M batch 512 capacity smoke；75,970,770 参数，峰值 CUDA allocated 约 8,923.00 MB |
+| `artifacts/omni_transformer_stage_ave_bidirectional_latent_external/train_10m_70m_result.json` | Stage AV-E 10M joint baseline 长训结果；answer test 97.25%，但 source/target recon 与双向 translation sequence exact 全为 0，判为 answer shortcut 负结果 |
+| `artifacts/omni_transformer_stage_ave_bidirectional_latent_external/train_10m_70m_checkpoints/` | Stage AV-E 10M joint baseline `latest.pt`/`best.pt` checkpoint 目录 |
+| `artifacts/omni_transformer_stage_avf_10m_bidirectional_dataset/smoke_dataset/manifest.json` | Stage AV-F 双向互译数据集 smoke manifest；896 examples、49,280 pair tokens，用于验证 AV-E manifest 训练入口 |
+| `artifacts/omni_transformer_stage_avf_10m_bidirectional_dataset/dataset_10m/manifest.json` | Stage AV-F 10M 级双向互译数据集 manifest；184,000 examples、10,120,000 pair tokens、train unique pair tokens 8,800,000 |
+| `artifacts/omni_transformer_stage_avf_10m_bidirectional_dataset/dataset_10m/` | Stage AV-F 10M 级 sharded `.pt` 数据集，包含 source_tokens、target_tokens、answers、ops 和 target_zones |
+| `artifacts/omni_transformer_stage_avg_strict_staged_10m_training/strict_cpu_smoke_result.json` | Stage AV-G 严格分阶段 CPU smoke，验证 5 个 stage 的 loss、manifest IO、checkpoint 和 samples 输出，不占用正在跑的 CUDA 长训 |
+| `artifacts/omni_transformer_stage_avg_strict_staged_10m_training/strict_cpu_resume_smoke_result.json` | Stage AV-G CPU resume smoke，验证 `latest.pt` 恢复后继续 strict staged schedule |
+| `artifacts/omni_transformer_stage_avg_strict_staged_10m_training/strict_cpu_smoke_checkpoints/` | Stage AV-G CPU smoke checkpoint 目录，验证 `latest.pt` 恢复链；未来 70M 长训应另用 `train_10m_70m_strict_checkpoints` |
+| `artifacts/omni_transformer_stage_avg_strict_staged_10m_training/train_10m_70m_strict_result.json` | Stage AV-G 10M strict staged 长训结果；answer test 77.85%，但 source/target recon 与双向 translation sequence exact 全为 0，说明 strict schedule 未修复 external codec |
+| `artifacts/omni_transformer_stage_avg_strict_staged_10m_training/train_10m_70m_strict_checkpoints/` | Stage AV-G 10M strict staged `latest.pt`/`best.pt` checkpoint 目录 |
+| `artifacts/omni_transformer_stage_avh_text_anchored_visual_edit_dataset/smoke_dataset/manifest.json` | Stage AV-H 文本锚定视觉编辑 smoke dataset manifest；896 examples、410,368 tokens，用于验证 dataset schema、shards 和样例渲染 |
+| `artifacts/omni_transformer_stage_avh_text_anchored_visual_edit_dataset/dataset_10m/manifest.json` | Stage AV-H 10M 文本锚定视觉编辑数据集 manifest；21,900 examples、10,030,200 tokens、train unique tokens 8,244,000 |
+| `artifacts/omni_transformer_stage_avh_text_anchored_visual_edit_dataset/dataset_10m/samples/` | Stage AV-H 10M 数据集 source/target PNG 和样例 JSON，用于人工检查 source record、edit instruction 与 target record/image 是否一致 |
+| `artifacts/omni_transformer_stage_avh_text_anchored_visual_edit_training/smoke_result.json` | Stage AV-H 小模型 CPU training smoke，验证五阶段 loss、manifest IO、checkpoint 和 samples 输出链路 |
+| `artifacts/omni_transformer_stage_avh_text_anchored_visual_edit_training/dataset10m_loader_smoke_result.json` | Stage AV-H 读取完整 10M manifest 的 loader smoke，验证 train/val/test/heldout 分片可读 |
+| `artifacts/omni_transformer_stage_avh_text_anchored_visual_edit_training/dataset10m_68m_capacity_smoke_result.json` | Stage AV-H 68M batch 96 CUDA capacity smoke；68,416,419 参数，峰值 CUDA allocated 约 5,004.43 MB |
+| `artifacts/omni_transformer_stage_avh_text_anchored_visual_edit_training/dataset10m_68m_batch128_capacity_smoke_result.json` | Stage AV-H 68M batch 128 CUDA capacity smoke；68,416,419 参数，峰值 CUDA allocated 约 6,537.45 MB，作为建议长训起点 |
+| `artifacts/omni_transformer_stage_avh_text_anchored_visual_edit_training/perf_fix_micro_cpu_smoke_result.json` | Stage AV-H micro-batch 性能修复后 CPU smoke，验证梯度累积、stage 输出头裁剪和 JSON 输出链路 |
+| `artifacts/omni_transformer_stage_avh_text_anchored_visual_edit_training/dataset10m_68m_batch128_micro64_perf_fix_smoke_result.json` | Stage AV-H 性能修复后推荐 CUDA smoke；effective batch 128、micro batch 64、Adafactor，峰值 CUDA allocated 约 4,893.83 MB，训练窗口 1.52 step/s |
+| `artifacts/omni_transformer_stage_avh_text_anchored_visual_edit_training/dataset10m_68m_batch128_micro96_perf_fix_smoke_result.json` | Stage AV-H micro batch 96 对照 smoke；峰值 CUDA allocated 约 6,696.90 MB，训练窗口慢于 micro 64，不作为默认长训配置 |
+| `artifacts/omni_transformer_stage_avh_text_anchored_visual_edit_training/train_10m_68m_result.json` | Stage AV-H 10M 68M 长训结果；旧 joint_debug 口径 target record exact 高但含 target_record teacher-forcing 泄漏，不能作为端到端通过证据 |
+| `artifacts/omni_transformer_stage_avh_text_anchored_visual_edit_training/train_10m_68m_stage_mode_diagnostic.json` | Stage AV-H 10M 长训后补非泄漏诊断；text_latent、image_ground、edit_reason、image_output、joint_teacher_record 和 joint_no_target_record 分模式评估 |
+| `artifacts/omni_transformer_stage_avh_text_anchored_visual_edit_training/nonleaky_eval_cpu_smoke_result.json` | Stage AV-H 训练脚本修正非泄漏多模式评估后的 CPU smoke，用于验证主指标不再默认使用 target_record teacher-forcing |
+| `artifacts/omni_transformer_stage_avh_text_anchored_visual_edit_training/samples/contact_sheet.png` | Stage AV-H 10M 长训样例 source/target/pred contact sheet；显示预测图有弱颜色/位置但明显模糊，MSE 不能单独作为图像闭合证据 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/smoke_result.json` | Stage AV-I 整图 latent 容量 smoke；CPU 2-step 验证 ordered/greedy prefix、整图 decoder 和样例输出链路 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/transparent_curriculum_cuda_smoke_v2_result.json` | Stage AV-I 透明背景 curriculum CUDA smoke；验证 RGBA、AMP、greedy eval 和输出目录不覆盖旧探针 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_100step_v2_result.json` | Stage AV-I 1/2/4/8/12/16/24 token 100-step CUDA probe；暴露短训会过度涂前景，不能判断 12 token 是否足够 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_12_24_1000step_result.json` | Stage AV-I 12 vs 24 token 1000-step 旧 CUDA probe；保留为黑背景/前景指标历史结果，不作为当前透明背景判断 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_transparent_curriculum_12_24_32_3000step_result.json` | Stage AV-I 透明背景 12/24/32 token 3000-step 全 train probe；12 token test transparent loss 0.002505、alpha IoU 0.9972，24/32 未优于 12 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_transparent_curriculum_12_24_32_3000step_summary.json` | Stage AV-I 透明背景 3000-step probe 汇总；抽取 final metrics、prefix curve、curriculum 和样例 contact sheet 路径 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/latent_dim2_cpu_smoke_result.json` | Stage AV-I `latent_dim=2` CPU smoke；验证 encoder/latent/decoder 宽度拆分和 1/2 token 输出链路 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/compact_prefix_cpu_smoke_v2_result.json` | Stage AV-I compact prefix CPU smoke；验证 active=1 时 compact area/coverage loss 已进入训练 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/precision_compact_cpu_smoke_result.json` | Stage AV-I precision compact CPU smoke；验证 coverage 奖励从 `x` 到动态 `x^n`，n 从 1 增至 4 且 precision coverage 指标进入 history |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/segment_precision_compact_cpu_smoke_result.json` | Stage AV-I segment precision compact CPU smoke；验证每个 active-token 段内 n 都从 0.5 重置到 5，且两端快、中间慢 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/correct_pixel_residual_cpu_smoke_result.json` | Stage AV-I schema v5 correct-pixel residual CPU smoke；验证前景正确像素 compact、wrong background/wrong color/missed foreground 指标、相邻 prefix residual routing loss 和样例输出链路 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/correct_pixel_residual_cpu_smoke_result_latent_2_samples/` | Stage AV-I correct-pixel residual CPU smoke 的 2-token 样例目录，含 target、ordered/greedy prefix PNG 和 `samples.json` |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_correct_pixel_residual_tokens_1_2_4_8_16_32_64_7000step_result.json` | Stage AV-I schema v5 correct-pixel residual 2 维 token 正式 probe；本轮失败，16 token 本轮最佳，64 token 仍只在 alpha IoU 上最高但综合重建和 correct pixel 退化 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_correct_pixel_residual_tokens_1_2_4_8_16_32_64_7000step_summary.json` | Stage AV-I correct-pixel residual 正式 probe 汇总；记录 soft/hard correct pixel、wrong background、wrong color、missed foreground、与 segment precision compact 的公共指标对比和失败判断 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_tokens_1_2_4_8_16_32_64_3000step_result.json` | Stage AV-I `latent_dim=2`、1/2/4/8/16/32/64 token 3000-step 全 train 极限 probe；32 token 最好但仍明显 ghost/object 混叠，64 token 退化需等步长复查 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_tokens_1_2_4_8_16_32_64_3000step_summary.json` | Stage AV-I 2 维 token 极限 probe 汇总；记录 latent scalars、final metrics、prefix curve、curriculum 和样例 contact sheet 路径 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_compact_tokens_1_2_4_8_16_32_64_7000step_result.json` | Stage AV-I 2 维 token compact + 7000-step 全 train probe；32 token 最好，test loss 0.044031、alpha IoU 0.9091，64 token 接近但未超过 32 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_compact_tokens_1_2_4_8_16_32_64_7000step_summary.json` | Stage AV-I 2 维 token compact + 7000-step 汇总；记录 area/coverage 指标、final metrics、prefix curve 和样例 contact sheet 路径 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_precision_compact_tokens_1_2_4_8_16_32_64_7000step_result.json` | Stage AV-I 2 维 token precision compact + 7000-step 全 train probe；n 从 1 增到 4，16 token 最好，test loss 0.042794、alpha IoU 0.9117，但 32/64 比线性 compact 变差 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_precision_compact_tokens_1_2_4_8_16_32_64_7000step_summary.json` | Stage AV-I 2 维 token precision compact 汇总；记录 precision coverage、final metrics、prefix curve、history 中动态 n 和样例 contact sheet 路径 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_segment_precision_compact_tokens_1_2_4_8_16_32_64_7000step_result.json` | Stage AV-I 2 维 token segment precision compact + 7000-step 全 train probe；每段 n=0.5->5、两端快中间慢，32 token 综合最好，test loss 0.037481、alpha IoU 0.9127 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_segment_precision_compact_tokens_1_2_4_8_16_32_64_7000step_summary.json` | Stage AV-I 2 维 token segment precision compact 汇总；记录分段 n history、final metrics、prefix curve、precision coverage 和样例 contact sheet 路径 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/latent_12_samples/ordered_contact_sheet.png` | Stage AV-I 12-token ordered prefix 样例图，展示 prefix 1/2/4/8/12 的整图重建演化 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/latent_24_samples/ordered_contact_sheet.png` | Stage AV-I 24-token ordered prefix 样例图，展示 prefix 1/2/4/8/16/24 的整图重建演化 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_transparent_curriculum_12_24_32_3000step_result_latent_12_samples/ordered_contact_sheet_checker.png` | Stage AV-I 12-token 透明背景 ordered prefix 棋盘底样例；显示 1-2 token 已重建大部分结构 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_transparent_curriculum_12_24_32_3000step_result_latent_24_samples/ordered_contact_sheet_checker.png` | Stage AV-I 24-token 透明背景 ordered prefix 棋盘底样例；用于对照 12 token 和后续 token 边际收益 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_transparent_curriculum_12_24_32_3000step_result_latent_32_samples/ordered_contact_sheet_checker.png` | Stage AV-I 32-token 透明背景 ordered prefix 棋盘底样例；用于观察更长 token bank 未带来明显改进 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_tokens_1_2_4_8_16_32_64_3000step_result_latent_32_samples/ordered_contact_sheet_checker.png` | Stage AV-I 2 维 32-token ordered prefix 棋盘底样例；当前极窄 latent 最好档，仍有 ghost/object 混叠 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_tokens_1_2_4_8_16_32_64_3000step_result_latent_64_samples/ordered_contact_sheet_checker.png` | Stage AV-I 2 维 64-token ordered prefix 棋盘底样例；显示长 token bank 在固定 3000 step curriculum 下退化 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_compact_tokens_1_2_4_8_16_32_64_7000step_result_latent_32_samples/ordered_contact_sheet_checker.png` | Stage AV-I compact 2 维 32-token ordered prefix 棋盘底样例；当前 compact 最好档，ghost/object 混叠明显低于旧 3000-step |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_compact_tokens_1_2_4_8_16_32_64_7000step_result_latent_64_samples/ordered_contact_sheet_checker.png` | Stage AV-I compact 2 维 64-token ordered prefix 棋盘底样例；显示 64 token 接近但未超过 32，仍有颜色/位置错配 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_precision_compact_tokens_1_2_4_8_16_32_64_7000step_result_latent_16_samples/ordered_contact_sheet_checker.png` | Stage AV-I precision compact 2 维 16-token ordered prefix 棋盘底样例；当前 precision compact 最好档，中等 token 精确性优于线性 compact |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_precision_compact_tokens_1_2_4_8_16_32_64_7000step_result_latent_64_samples/ordered_contact_sheet_checker.png` | Stage AV-I precision compact 2 维 64-token ordered prefix 棋盘底样例；显示 n=1->4 对长 token bank 未带来收益，仍有颜色/位置错配 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_segment_precision_compact_tokens_1_2_4_8_16_32_64_7000step_result_latent_32_samples/ordered_contact_sheet_checker.png` | Stage AV-I segment precision compact 2 维 32-token ordered prefix 棋盘底样例；当前综合重建 loss 最好档 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_segment_precision_compact_tokens_1_2_4_8_16_32_64_7000step_result_latent_64_samples/ordered_contact_sheet_checker.png` | Stage AV-I segment precision compact 2 维 64-token ordered prefix 棋盘底样例；alpha IoU 最高但颜色/对象误差高于 32 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_correct_pixel_residual_tokens_1_2_4_8_16_32_64_7000step_result_latent_16_samples/ordered_contact_sheet_checker.png` | Stage AV-I correct-pixel residual 2 维 16-token ordered prefix 棋盘底样例；本轮综合指标最佳但低于上一轮 segment precision compact |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_correct_pixel_residual_tokens_1_2_4_8_16_32_64_7000step_result_latent_32_samples/ordered_contact_sheet_checker.png` | Stage AV-I correct-pixel residual 2 维 32-token ordered prefix 棋盘底样例；显示对象收缩、缺失和错色，未超过 16 |
+| `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_correct_pixel_residual_tokens_1_2_4_8_16_32_64_7000step_result_latent_64_samples/ordered_contact_sheet_checker.png` | Stage AV-I correct-pixel residual 2 维 64-token ordered prefix 棋盘底样例；显示后续 token 压背景/修 mask 但颜色和对象错误更重 |
 | `artifacts/omni_transformer_stage_ai_image_generation_editing/result.json` | Stage AI 单 seed GPU 图像生成/编辑早期结果，保留为正式 sweep 前的参考 |
 | `artifacts/omni_transformer_stage_ai_image_generation_editing/smoke_result.json` | Stage AI 小规模 smoke 结果，用于快速验证脚本、GPU、JSON 和 PNG 输出链路 |
 | `artifacts/omni_transformer_stage_ai_image_generation_editing/samples/result/` | Stage AI 正式单 seed 的源图、目标图、prompt direct、latent output、latent image edit 和 no-source PNG 样例 |
@@ -267,7 +358,7 @@
 | `artifacts/p0_stage_aj_checkpoint_resume_smoke/uninterrupted_result.json` | Stage AJ P0 uninterrupted 对照结果，用于比较 resume 与不中断训练的关键指标差异 |
 | `artifacts/p0_stage_aj_checkpoint_resume_smoke/resume_checkpoints/` | Stage AJ P0 resume smoke 的 latest/best checkpoint 和 step 级样例 PNG/JSON |
 | `docs/feasibility-report.md` | 中文可行性结论、关联项目概念映射、截至 Stage AM 的全部实验结论和未证明边界 |
-| `docs/next-stage-test-plan.md` | 下一阶段测试任务规划，定义 P0-P3 挑战矩阵、Stage AN/AO/AP/AQ/AR/AS/AT 等任务、通过门槛、旧路线收口规则、完成状态和担忧 |
+| `docs/next-stage-test-plan.md` | 下一阶段测试任务规划，定义 P0-P3 挑战矩阵、Stage AN/AO/AP/AQ/AR/AS/AT/AV 等任务、通过门槛、旧路线收口规则、完成状态和担忧 |
 | `docs/experiment-general-lessons.md` | 从当前全部实验中按任务线抽取的失败、修复和跨任务通用规则，只保留后续所有任务都应遵守的原则和担忧 |
 | `docs/from-scratch-training-vram-quantization.md` | 从 0 训练完整架构验证的显存档位、量化收益、无效量化、购卡优先级和正式验证下限 |
 | `docs/text-to-latent-thought-experiment.md` | 纯文本思考训练迁移到特殊 latent token 内部思考的本机 GPU 实验报告 |
@@ -317,6 +408,15 @@
 | `docs/omni-transformer-stage-ar-cross-expert-visual-experiment.md` | Stage AR 视觉中心跨专家不可单解任务报告，记录四路输入因果依赖、direct baseline、probe 修正、正式 3 seed 结果和边界 |
 | `docs/omni-transformer-stage-as-file-audit-experiment.md` | Stage AS 真实文件证据审计报告，记录 HTML/CSV/PDF/截图受控工具读取、引用准确率、no-tool-history 消融、正式 3 seed 结果和边界 |
 | `docs/omni-transformer-stage-at-memory-exploration-experiment.md` | Stage AT 长程局部记忆和探索成本报告，记录主动建图、强 no-memory oracle、错误 memory 修正、正式 3 seed 结果和边界 |
+| `docs/omni-transformer-stage-av-from-scratch-micro-omni-experiment.md` | Stage AV 70M 从零集成 Micro-Omni 报告，记录本机容量、probe 正负信号、视觉 grounding 未闭合和下一步分阶段训练建议 |
+| `docs/omni-transformer-stage-avb-staged-latent-training.md` | Stage AV-B 分阶段潜空间训练报告，记录新训练顺序、GPU 优化、smoke、batch 256 长训建议和功耗监控口径 |
+| `docs/omni-transformer-stage-avc-dataset-pipeline.md` | Stage AV-C 大规模合成数据流水线报告，记录 sharded dataset、1B token 规模估算、smoke 和下一步接训练脚本 |
+| `docs/omni-transformer-stage-avd-1b-first-dataset-design.md` | Stage AV-D 1B-first 数据集设计，定义 1B 母分布、10M 定向降熵裁剪、任务熵、hard negative、split 和训练阶段映射 |
+| `docs/omni-transformer-stage-ave-bidirectional-latent-external.md` | Stage AV-E 双向互译实验报告，记录 source external ↔ latent ↔ target external、probe 结果、latent cosine 不可靠和下一步数据设计要求 |
+| `docs/omni-transformer-stage-avf-10m-bidirectional-dataset.md` | Stage AV-F 10M 级双向互译数据集报告，记录 manifest schema、已生成数据规模、CUDA smoke、70M capacity smoke 和建议长训命令 |
+| `docs/omni-transformer-stage-avg-strict-staged-10m-training.md` | Stage AV-G 严格分阶段 10M 训练报告，记录 stage schedule、独立输出路径、CPU smoke/resume 和严格架构长训命令 |
+| `docs/omni-transformer-stage-avh-text-anchored-visual-edit.md` | Stage AV-H 文本锚定视觉编辑数据集与训练报告，记录与 AI/AJ/AP 的区别、10M manifest、五阶段训练、训练性能修复、68M 长训负结果、非泄漏诊断和担忧 |
+| `docs/omni-transformer-stage-avi-whole-image-latent-capacity.md` | Stage AV-I 整图 latent token 容量诊断报告，记录透明背景 RGBA、短到长 curriculum、宽 token 12/24/32 probe、2 维 token 极限 probe、compact / precision / segment precision compact probe、schema v5 correct-pixel residual smoke 与正式负结果、低熵判断和下一步 loss/schedule 修正 |
 | `docs/archive/README-2026-07-04-legacy-command-list.md` | 2026-07-04 重写 README 前的旧版命令清单和逐阶段实验链接归档，仅作记录性查阅 |
 | `docs/DIRECTORY_REFERENCE.md` | 当前文件，保持测试工作区结构可检索 |
 
@@ -364,6 +464,15 @@
 |   |-- omni_transformer_stage_ar_cross_expert_visual.py
 |   |-- omni_transformer_stage_as_file_audit.py
 |   |-- omni_transformer_stage_at_memory_exploration.py
+|   |-- omni_transformer_stage_av_from_scratch_micro_omni.py
+|   |-- omni_transformer_stage_avb_staged_latent_training.py
+|   |-- omni_transformer_stage_avc_dataset_pipeline.py
+|   |-- omni_transformer_stage_ave_bidirectional_latent_external.py
+|   |-- omni_transformer_stage_avf_10m_bidirectional_dataset.py
+|   |-- omni_transformer_stage_avg_strict_staged_10m_training.py
+|   |-- omni_transformer_stage_avh_text_anchored_visual_edit_dataset.py
+|   |-- omni_transformer_stage_avh_text_anchored_visual_edit_training.py
+|   |-- omni_transformer_stage_avi_whole_image_latent_capacity.py
 |   |-- text_to_latent_sweep.py
 |   |-- text_to_latent_thought.py
 |   |-- visual_multimodal_stage_ab.py
@@ -422,6 +531,15 @@
 |   |-- omni-transformer-stage-ar-cross-expert-visual-experiment.md
 |   |-- omni-transformer-stage-as-file-audit-experiment.md
 |   |-- omni-transformer-stage-at-memory-exploration-experiment.md
+|   |-- omni-transformer-stage-av-from-scratch-micro-omni-experiment.md
+|   |-- omni-transformer-stage-avb-staged-latent-training.md
+|   |-- omni-transformer-stage-avc-dataset-pipeline.md
+|   |-- omni-transformer-stage-avd-1b-first-dataset-design.md
+|   |-- omni-transformer-stage-ave-bidirectional-latent-external.md
+|   |-- omni-transformer-stage-avf-10m-bidirectional-dataset.md
+|   |-- omni-transformer-stage-avg-strict-staged-10m-training.md
+|   |-- omni-transformer-stage-avh-text-anchored-visual-edit.md
+|   |-- omni-transformer-stage-avi-whole-image-latent-capacity.md
 |   |-- text-to-latent-thought-experiment.md
 |   |-- visual-multimodal-stage-ab-experiment.md
 |   |-- visual-multimodal-stage-c-experiment.md
@@ -531,6 +649,15 @@
 | Stage AR 视觉中心跨专家不可单解任务、四路缺模态消融和 direct baseline | `docs/omni-transformer-stage-ar-cross-expert-visual-experiment.md`、`experiments/omni_transformer_stage_ar_cross_expert_visual.py` 与 `artifacts/omni_transformer_stage_ar_cross_expert_visual/` |
 | Stage AS 真实文件证据审计、引用准确率和 no-tool-history 消融 | `docs/omni-transformer-stage-as-file-audit-experiment.md`、`experiments/omni_transformer_stage_as_file_audit.py` 与 `artifacts/omni_transformer_stage_as_file_audit/` |
 | Stage AT 长程局部记忆、探索成本、强 no-memory oracle 和错误 memory 修正 | `docs/omni-transformer-stage-at-memory-exploration-experiment.md`、`experiments/omni_transformer_stage_at_memory_exploration.py` 与 `artifacts/omni_transformer_stage_at_memory_exploration/` |
+| Stage AV 70M 从零集成 Micro-Omni、本机容量和视觉 grounding 负结果 | `docs/omni-transformer-stage-av-from-scratch-micro-omni-experiment.md`、`experiments/omni_transformer_stage_av_from_scratch_micro_omni.py` 与 `artifacts/omni_transformer_stage_av_from_scratch_micro_omni/` |
+| Stage AV-B 分阶段潜空间训练、GPU 常驻数据、checkpoint/resume 和 batch 256 长训建议 | `docs/omni-transformer-stage-avb-staged-latent-training.md`、`experiments/omni_transformer_stage_avb_staged_latent_training.py` 与 `artifacts/omni_transformer_stage_avb_staged_latent_training/` |
+| Stage AV-C 大规模合成数据流水线、1B token 估算和 sharded smoke 数据集 | `docs/omni-transformer-stage-avc-dataset-pipeline.md`、`experiments/omni_transformer_stage_avc_dataset_pipeline.py` 与 `artifacts/omni_transformer_stage_avc_dataset_pipeline/` |
+| Stage AV-D 1B-first 母分布、10M 定向裁剪和高熵数据设计 | `docs/omni-transformer-stage-avd-1b-first-dataset-design.md` |
+| Stage AV-E 潜变量与外部表征双向互译、source->target、target->source、latent edit 和 10M joint 负结果 | `docs/omni-transformer-stage-ave-bidirectional-latent-external.md`、`experiments/omni_transformer_stage_ave_bidirectional_latent_external.py` 与 `artifacts/omni_transformer_stage_ave_bidirectional_latent_external/train_10m_70m_result.json` |
+| Stage AV-F 10M 级双向互译数据集、AV-E/AV-G 训练入口和 10M 负结果对照 | `docs/omni-transformer-stage-avf-10m-bidirectional-dataset.md`、`experiments/omni_transformer_stage_avf_10m_bidirectional_dataset.py`、`artifacts/omni_transformer_stage_avf_10m_bidirectional_dataset/dataset_10m/manifest.json`、`artifacts/omni_transformer_stage_ave_bidirectional_latent_external/train_10m_70m_result.json` 与 `artifacts/omni_transformer_stage_avg_strict_staged_10m_training/train_10m_70m_strict_result.json` |
+| Stage AV-G 严格分阶段 10M 训练、独立 checkpoint、CPU smoke/resume 和 10M strict staged 负结果 | `docs/omni-transformer-stage-avg-strict-staged-10m-training.md`、`experiments/omni_transformer_stage_avg_strict_staged_10m_training.py` 与 `artifacts/omni_transformer_stage_avg_strict_staged_10m_training/train_10m_70m_strict_result.json` |
+| Stage AV-H 文本锚定视觉编辑数据集、10M manifest、五阶段训练入口、训练性能修复、68M 长训负结果和非泄漏诊断 | `docs/omni-transformer-stage-avh-text-anchored-visual-edit.md`、`experiments/omni_transformer_stage_avh_text_anchored_visual_edit_dataset.py`、`experiments/omni_transformer_stage_avh_text_anchored_visual_edit_training.py`、`artifacts/omni_transformer_stage_avh_text_anchored_visual_edit_dataset/dataset_10m/manifest.json`、`artifacts/omni_transformer_stage_avh_text_anchored_visual_edit_training/train_10m_68m_result.json` 与 `artifacts/omni_transformer_stage_avh_text_anchored_visual_edit_training/train_10m_68m_stage_mode_diagnostic.json` |
+| Stage AV-I 整图 latent token 容量诊断、透明背景 curriculum、宽 token probe、2 维 token 极限曲线、compact/precision compact 前缀约束和 schema v5 correct-pixel residual 训练语义 | `docs/omni-transformer-stage-avi-whole-image-latent-capacity.md`、`experiments/omni_transformer_stage_avi_whole_image_latent_capacity.py`、`artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_transparent_curriculum_12_24_32_3000step_result.json`、`artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_transparent_curriculum_12_24_32_3000step_summary.json`、`artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_tokens_1_2_4_8_16_32_64_3000step_result.json`、`artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_tokens_1_2_4_8_16_32_64_3000step_summary.json`、`artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_compact_tokens_1_2_4_8_16_32_64_7000step_result.json`、`artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_compact_tokens_1_2_4_8_16_32_64_7000step_summary.json`、`artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_precision_compact_tokens_1_2_4_8_16_32_64_7000step_result.json`、`artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_precision_compact_tokens_1_2_4_8_16_32_64_7000step_summary.json`、`artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_segment_precision_compact_tokens_1_2_4_8_16_32_64_7000step_result.json`、`artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_segment_precision_compact_tokens_1_2_4_8_16_32_64_7000step_summary.json`、`artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/correct_pixel_residual_cpu_smoke_result.json`、`artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_correct_pixel_residual_tokens_1_2_4_8_16_32_64_7000step_result.json` 与 `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_correct_pixel_residual_tokens_1_2_4_8_16_32_64_7000step_summary.json` |
 | Stage AI 图像生成与源图编辑输出专家实验 | `experiments/omni_transformer_stage_ai_image_generation_editing.py` 与 `artifacts/omni_transformer_stage_ai_image_generation_editing/` |
 | Stage AI 低熵图像生成/编辑任务饱和与消融结论 | `docs/omni-transformer-stage-ai-image-generation-editing-experiment.md` |
 | Stage AJ Transformer 图像 IO 保真实验 | `experiments/omni_transformer_stage_aj_transformer_image_io_fidelity.py` 与 `artifacts/omni_transformer_stage_aj_transformer_image_io_fidelity/` |
