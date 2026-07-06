@@ -271,6 +271,34 @@ Stage AV-C 目前只完成数据生成流水线，没有训练结论。
 - 70M 档配置仍为 `d_model=480/layers=8/heads=8`，参数量 72,161,403；batch256 2-step capacity peak CUDA allocated 约 4,628.25 MB。
 - 文档中已给出 AV-J-B 70M 长训命令；大型训练由用户启动。
 
+用户本地已完成 AV-J-B 70M 长训：
+
+- 结果：`artifacts/omni_transformer_stage_avjb_trace_verifier/train_70m_result.json`，汇总 `artifacts/omni_transformer_stage_avjb_trace_verifier/train_70m_summary.json`。
+- 成本：72,161,403 参数、20,000 steps、elapsed 4,331.86 sec、peak CUDA allocated 5,014.52 MB。
+- test full source record exact 99.58%，target record exact 69.48%，answer sequence exact 98.71%。
+- heldout target record exact 68.92%，answer sequence exact 98.58%。
+- test candidate mask exact 41.76%，count value accuracy 97.39%，copy gate accuracy 96.91%，verifier accuracy 83.52%。
+- test no_source target record exact 23.71%，no_process target record exact 11.60%；但 no_source/no_process answer sequence exact 仍有 85.38% / 66.99%。
+- 分任务 target record exact：conditional_recolor 87.85%，same_row_move 71.65%，count_delete_or_add 48.93%。
+- 结论：AV-J-B 70M 不通过。相比 AV-J，test target record exact 只提升约 1.71 个百分点；count/copy 辅助头能学，但 candidate mask 没闭合，answer shortcut 仍存在。下一步不应继续用 answer 高分当方向信号，应做 AV-J-C：answer loss 先置 0，修 candidate mask 的监督和类别不平衡，显式训练 slot selection/delete/insert 状态变换，再恢复 answer writer。
+
+2026-07-07 已准备 Stage AV-J-C RL / verifier reward 训练入口：
+
+- Stage AV-J-C：`docs/omni-transformer-stage-avjc-rl-verifier-reward.md`。
+- 脚本：`experiments/omni_transformer_stage_avjc_rl_verifier_reward.py`。
+- AV-J-C 复用 AV-J-B 结构，但把后半段切成采样 target record / candidate / count 的 self-critical policy-gradient reward；reward 使用 oracle verifier，baseline 使用 greedy reward，answer loss 默认 0。
+- 已完成 `tests/test_stage_avjc_rl_verifier_reward.py`、CPU smoke、CPU resume smoke 和 70M batch256 RL 2-step capacity。
+- 70M capacity 仍为 72,161,403 参数，batch256 直接进 RL 阶段 peak CUDA allocated 约 3,279.69 MB。
+- 建议优先从 `artifacts/omni_transformer_stage_avjb_trace_verifier/train_70m_checkpoints/latest.pt` 初始化，只跑 AV-J-C RL 阶段，先看 target record / candidate mask 是否突破 AV-J-B 平台。
+
+用户本地已完成 AV-J-C 两条 70M 长训：
+
+- checkpoint->RL：`artifacts/omni_transformer_stage_avjc_rl_verifier_reward/rl_from_avjb_70m_result.json`，汇总 `artifacts/omni_transformer_stage_avjc_rl_verifier_reward/rl_from_avjb_70m_summary.json`。
+- 从头 SFT+RL：`artifacts/omni_transformer_stage_avjc_rl_verifier_reward/train_70m_result.json`，汇总 `artifacts/omni_transformer_stage_avjc_rl_verifier_reward/train_70m_summary.json`。
+- checkpoint->RL test target record exact 为 75.24%，heldout 77.25%，相比 AV-J-B test 69.48% 提升约 5.76 个百分点；但 candidate mask exact 只有 43.44%，no-source target exact 升到 31.47%。
+- 从头 SFT+RL test target record exact 为 65.87%，heldout 67.58%，低于 AV-J-B；candidate mask exact 仍 43.44%，no-source target exact 升到 40.28%。
+- 结论：AV-J-C 当前实现不通过。record-level RL reward 有真实信号，但 reward 太粗，未修 candidate selection，且 no-source shortcut 变强。下一步不应继续延长同一 reward，应做 AV-J-D：任务族/步骤级 edit rollout reward，并把 no-source/no-process penalty 纳入训练 reward。
+
 ## 推荐执行顺序
 
 1. P0 已先在 Stage AJ 落地；后续长训脚本要复用同一恢复与结果 schema。
@@ -278,7 +306,7 @@ Stage AV-C 目前只完成数据生成流水线，没有训练结论。
 3. Stage AP 已完成正式单 seed；图像输出路线下一步应转向多 seed 或更高熵图像任务。
 4. Stage AO 已完成后，Stage AR 已先验证视觉中心四路专家因果依赖，Stage AS 已验证小型真实文件边界和引用审计链路，Stage AT 已验证受控长程局部记忆的探索成本收益。
 5. Stage AV 已证明 70M 本机从零训练可承受，但单阶段集成未通过；Stage AV-B 到 AV-G 证明“分阶段”和“互译”方向必要，但 external codec/translation exact 没闭合。
-6. AV-H/AV-I 保留为图像外设与 latent token 容量诊断，不再作为当前主线。AV-J 70M 已完成但未通过；AV-J-B 已准备好长训入口，下一步由用户启动 AV-J-B 70M，重点看 target record exact、candidate/count/copy gate 和 answer shortcut 是否改善。
+6. AV-H/AV-I 保留为图像外设与 latent token 容量诊断，不再作为当前主线。AV-J、AV-J-B 与 AV-J-C 70M 均已完成但未通过；AV-J-C 证明 RL reward 有方向性但太粗。下一步应做 AV-J-D，把 reward 拆到任务族/步骤级 edit rollout，并把 no-source/no-process penalty 放进训练目标。
 7. P2 的 AR/AS/AT/AV 不要混成一个超大实验。跨专家、真实文件、长程记忆、从零集成、数据规模、预训练专家各自都有不同失败点，必须分开归因。
 
 ## 旧路线收口规则

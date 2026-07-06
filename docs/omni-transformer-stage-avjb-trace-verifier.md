@@ -116,6 +116,38 @@ artifacts\omni_transformer_stage_avjb_trace_verifier\capacity_70m_batch256_2step
 
 如果训练中 answer 仍过快升高而 target record 不动，可以把 `--answer-token-weight` 降到 `0.0` 跑纯 target/trace 版。
 
+## 70M 长训结果
+
+用户本地已完成上述 70M 长训：
+
+```powershell
+artifacts\omni_transformer_stage_avjb_trace_verifier\train_70m_result.json
+artifacts\omni_transformer_stage_avjb_trace_verifier\train_70m_summary.json
+```
+
+| 项 | 数值 |
+| --- | ---: |
+| 参数量 | 72,161,403 |
+| steps | 20,000 |
+| elapsed | 4,331.86 sec |
+| peak CUDA allocated | 5,014.52 MB |
+| test source record exact | 99.58% |
+| test target record exact | 69.48% |
+| heldout target record exact | 68.92% |
+| test answer sequence exact | 98.71% |
+| test candidate mask exact | 41.76% |
+| test count value accuracy | 97.39% |
+| test copy gate accuracy | 96.91% |
+| test verifier accuracy | 83.52% |
+| test no-source answer sequence exact | 85.38% |
+| test no-process answer sequence exact | 66.99% |
+
+按任务族看，test `conditional_recolor` target record exact 为 87.85%，`same_row_move` 为 71.65%，`count_delete_or_add` 为 48.93%。相比 AV-J，test target record exact 只从 67.77% 提到 69.48%，提升约 1.71 个百分点；answer sequence exact 仍约 99%。
+
+结论：AV-J-B 70M 不通过。rich trace 中 `count value` 和 `copy gate` 可以学到，但 `candidate mask` 没有闭合，target record 仍卡在约 69%，且 `no_source` answer 仍约 85%，说明答案捷径没有被消掉。结构化 oracle trace 作为 SFT 脚手架有帮助，但不足以让模型形成可靠的 teacher-free latent chain。
+
+下一步不应把本轮结果升级为通过证据。更合理的 AV-J-C 方向是：先把 answer loss 设为 0 跑 target/trace-only，修 candidate mask 的监督形式和类别不平衡；再把 same-row/count 的过程改成更显式的 slot selection / delete / insert 状态变换；最后再恢复 answer writer。
+
 ## 通过标准
 
 必须同时看：
