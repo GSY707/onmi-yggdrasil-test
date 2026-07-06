@@ -238,6 +238,39 @@ Stage AV-C 目前只完成数据生成流水线，没有训练结论。
 - AV-J 通过门槛必须同时看 source/target record exact、answer exact、trace/read accuracy、teacher-free eval 和 no-source/no-operation/no-trace 消融；answer 单独高不算通过。
 - 图像外设应在 AV-J 后接入：先验证 `record -> image` 与 `image -> latent -> record` 的双向翻译，再进入图像编辑/生成。
 
+2026-07-06 已准备 Stage AV-J 潜空间状态推理核心训练入口，停在大型训练前：
+
+- Stage AV-J：`docs/omni-transformer-stage-avj-latent-reasoning-core.md`。
+- 脚本：`experiments/omni_transformer_stage_avj_latent_reasoning_core.py`。
+- 任务从单点问答升级为 record 级状态变换：`conditional_recolor`、`same_row_move`、`count_delete_or_add`。
+- 模型输入 `source scene record + text operation`，输出 `target scene record + answer tokens`，并监督 `read_a/read_b/edit_slot/condition/edit_action/edit field` teacher trace；推理期不输入 teacher trace。
+- 已完成 CPU smoke、CPU resume smoke、CUDA capacity smoke 和单元测试 `tests/test_stage_avj_latent_reasoning_core.py`。
+- CUDA smoke 使用 `d_model=192/layers=3/heads=4/batch=128`，参数量 4,863,087，只证明 AMP、GPU resident data、checkpoint 和 eval variants 可跑，不提供能力结论。
+- 70M 档已修正为 `d_model=480/layers=8/heads=8`，参数量 71,694,351；batch256 2-step capacity 通过，peak CUDA allocated 约 4,629.29 MB。
+- `d_model=768/layers=10/heads=12` 在 AV-J 当前结构下约 225.8M，不是 70M；batch512 20-step capacity 在本轮 180 秒工具窗口内未完成，未产出 JSON。
+- 文档中已给出修正后的 70M 训练命令和 70M batch256 20-step capacity 命令；大型训练由用户启动。
+
+用户本地已完成 AV-J 70M 长训：
+
+- 结果：`artifacts/omni_transformer_stage_avj_latent_reasoning_core/train_70m_result.json`，汇总 `artifacts/omni_transformer_stage_avj_latent_reasoning_core/train_70m_summary.json`。
+- 成本：71,694,351 参数、17,000 steps、elapsed 2,982.64 sec、peak CUDA allocated 5,007.75 MB。
+- test full source record exact 99.78%，target record exact 67.77%，answer sequence exact 98.78%。
+- heldout full source record exact 99.95%，target record exact 67.19%，answer sequence exact 98.97%。
+- test read_a/read_b/edit_slot 为 91.46% / 72.22% / 71.19%，condition/edit_action 为 98.51% / 99.66%。
+- test no_source target record exact 8.62%，no_operation target record exact 0.00%，no_process target record exact 11.74%；但 no_source/no_process answer sequence exact 仍有 86.13% / 80.32%。
+- 分任务 target record exact：conditional_recolor 约 91%，same_row_move 约 62%，count_delete_or_add 约 50%。
+- 结论：AV-J 70M 不通过。source codec、operation 条件和 answer token 已学会，但 target record 状态改写未闭合，answer head 有明显模板/动作捷径。下一步应做 AV-J-B：弱化/后移 answer loss，增加 per-slot edit delta / copy-vs-update gate，强化 read_b/edit_slot hard negative，并把 count add/delete 拆成显式 count、delete slot、insert cell 过程态。
+
+2026-07-06 已准备 Stage AV-J-B 长链 trace / verifier 训练入口，停在大型训练前：
+
+- Stage AV-J-B：`docs/omni-transformer-stage-avjb-trace-verifier.md`。
+- 脚本：`experiments/omni_transformer_stage_avjb_trace_verifier.py`。
+- AV-J-B 复用 AV-J 的 record/text 数据分布，但加入 same-row candidate mask、count value、copy-vs-update gate、字段级 target accuracy、record verifier，并把 answer loss 后移且默认降到 0.05。
+- 新 schedule 为 `codec -> trace_sft -> target_verifier -> joint`，目标是用 oracle solver 生成的结构化 trace 引导模型形成自己的 latent chain，而不是继续背 answer 模板。
+- 已完成 `tests/test_stage_avjb_trace_verifier.py`、CPU smoke、CPU resume smoke、CUDA smoke 和 70M batch256 2-step capacity。
+- 70M 档配置仍为 `d_model=480/layers=8/heads=8`，参数量 72,161,403；batch256 2-step capacity peak CUDA allocated 约 4,628.25 MB。
+- 文档中已给出 AV-J-B 70M 长训命令；大型训练由用户启动。
+
 ## 推荐执行顺序
 
 1. P0 已先在 Stage AJ 落地；后续长训脚本要复用同一恢复与结果 schema。
@@ -245,7 +278,7 @@ Stage AV-C 目前只完成数据生成流水线，没有训练结论。
 3. Stage AP 已完成正式单 seed；图像输出路线下一步应转向多 seed 或更高熵图像任务。
 4. Stage AO 已完成后，Stage AR 已先验证视觉中心四路专家因果依赖，Stage AS 已验证小型真实文件边界和引用审计链路，Stage AT 已验证受控长程局部记忆的探索成本收益。
 5. Stage AV 已证明 70M 本机从零训练可承受，但单阶段集成未通过；Stage AV-B 到 AV-G 证明“分阶段”和“互译”方向必要，但 external codec/translation exact 没闭合。
-6. AV-H/AV-I 保留为图像外设与 latent token 容量诊断，不再作为当前主线。下一步主线应切到 AV-J：先在自构造 record/text/teacher trace 上打通 latent workspace 的读写、主动读取、过程态和 target record/answer，再把同一 record 分布接回图像外设。
+6. AV-H/AV-I 保留为图像外设与 latent token 容量诊断，不再作为当前主线。AV-J 70M 已完成但未通过；AV-J-B 已准备好长训入口，下一步由用户启动 AV-J-B 70M，重点看 target record exact、candidate/count/copy gate 和 answer shortcut 是否改善。
 7. P2 的 AR/AS/AT/AV 不要混成一个超大实验。跨专家、真实文件、长程记忆、从零集成、数据规模、预训练专家各自都有不同失败点，必须分开归因。
 
 ## 旧路线收口规则
