@@ -1,8 +1,8 @@
 # Directory Reference
 
-本仓库是 `Project-Yggdrasil 未来多模态潜空间智能体架构` 的独立可行性测试工作区。关联项目 `C:\skzy\QuickFileTransport\世界树计划` 只作为概念真源读取，本仓库不修改其源码。
+本仓库是 `Project-Yggdrasil V2 多模态潜变量推理架构` 的独立研究与代理实验工作区。关联项目 `C:\skzy\QuickFileTransport\世界树计划` 的正式设计哲学是上位概念真源，本仓库不修改其源码。
 
-"docs/Project-Yggdrasil 未来多模态潜空间智能体架构.md" 是本项目需要测试的架构的白皮书。
+`docs/Project-Yggdrasil 多模态潜变量推理架构白皮书 V2.md` 是当前唯一目标架构白皮书；`docs/Project-Yggdrasil V2 从架构验证到商用路线图.md` 是唯一高层路线；`docs/next-stage-test-plan.md` 只维护最近的 V2-A/V2-B 实验。原 V1 和旧 Stage A—AV-J-C 只保留为历史思想与代理证据，不能继续作为当前实现路线。
 "note.txt" 是用户的笔记，可以参考其中的内容，但不要删。
 
 ## 顶层摘要
@@ -10,8 +10,13 @@
 | 路径 | 用途 |
 | --- | --- |
 | `README.md` | 项目简短介绍、近期图像生成/编辑成果、Stage E+F 多模态融合成功结果、目标路线、初步证明和最小验证入口 |
+| `docs/Project-Yggdrasil 多模态潜变量推理架构白皮书 V2.md` | 当前唯一目标架构规范：连续 latent recurrence、Boundary-MoE + FFN-MoE、Attention Pump/bypass、专家可见性与调用、自然语言审计、工作树/记忆树、离线专家晋升及完整版/商用版边界 |
+| `docs/Project-Yggdrasil V2 从架构验证到商用路线图.md` | V2 唯一高层路线：从 R0 基线、R1 推理介质、R2/R3 多模态双层 MoE，到架构完整版、产品工程、客户试点与商用 GA |
+| `docs/next-stage-test-plan.md` | 当前最近执行真源：直接切换到 V2-A 推理介质与 V2-B 多模态双层 MoE，定义 smoke/probe/formal、Gate、消融、成本和旧路线收口 |
+| `docs/Project-Yggdrasil 未来多模态潜空间智能体架构.md` | V1 历史白皮书；只保留原始思想来源，已被 V2 直接取代，不再作为实现或评测依据 |
+| `docs/project-yggdrasil-latent-reasoning-architecture-review-2026-07-11.md` | V2 决策形成记录：解释离散 token 与连续向量推理、双层 MoE、统一维度、Attention Pump、审计和两部分实验的推导过程 |
 | `docs/experiment-general-lessons.md` | 当前实验按任务线沉淀出的失败、修复和通用规则，覆盖统一 latent bus、专家分工、输出头、图像保真、长训恢复和旧路线收口 |
-| `docs/omni-latent-reasoning-route-and-goals.md` | 2026-07-06 AV 线正确路线回收：先打通 `external <-> latent workspace <-> latent reasoning <-> external`，把自构造图像和 teacher 作为外设监督源，建议下一步 Stage AV-J |
+| `docs/omni-latent-reasoning-route-and-goals.md` | 2026-07-06 AV 线历史路线回收记录：曾提出 `external <-> latent workspace <-> latent reasoning <-> external` 与 Stage AV-J；当前执行已由 V2 白皮书和 V2-A/V2-B 计划取代 |
 | `docs/from-scratch-training-vram-quantization.md` | 从 0 训练完整架构验证的显存、量化、省显存边界和最低价整机购卡建议 |
 | `pyproject.toml` | Python 测试配置、pytest 可选依赖、DocVQA 数据读取可选依赖与预训练/LLaVA 实验依赖 |
 | `.gitignore` | 忽略本地虚拟环境、pytest 缓存、大模型 checkpoint 和本地 HF token 文件 |
@@ -388,7 +393,6 @@
 | `artifacts/p0_stage_aj_checkpoint_resume_smoke/uninterrupted_result.json` | Stage AJ P0 uninterrupted 对照结果，用于比较 resume 与不中断训练的关键指标差异 |
 | `artifacts/p0_stage_aj_checkpoint_resume_smoke/resume_checkpoints/` | Stage AJ P0 resume smoke 的 latest/best checkpoint 和 step 级样例 PNG/JSON |
 | `docs/feasibility-report.md` | 中文可行性结论、关联项目概念映射、截至 Stage AM 的全部实验结论和未证明边界 |
-| `docs/next-stage-test-plan.md` | 下一阶段测试任务规划，定义 P0-P3 挑战矩阵、Stage AN/AO/AP/AQ/AR/AS/AT/AV 等任务、通过门槛、旧路线收口规则、完成状态和担忧 |
 | `docs/experiment-general-lessons.md` | 从当前全部实验中按任务线抽取的失败、修复和跨任务通用规则，只保留后续所有任务都应遵守的原则和担忧 |
 | `docs/from-scratch-training-vram-quantization.md` | 从 0 训练完整架构验证的显存档位、量化收益、无效量化、购卡优先级和正式验证下限 |
 | `docs/text-to-latent-thought-experiment.md` | 纯文本思考训练迁移到特殊 latent token 内部思考的本机 GPU 实验报告 |
@@ -506,6 +510,9 @@
 |   |-- omni_transformer_stage_avh_text_anchored_visual_edit_dataset.py
 |   |-- omni_transformer_stage_avh_text_anchored_visual_edit_training.py
 |   |-- omni_transformer_stage_avi_whole_image_latent_capacity.py
+|   |-- omni_transformer_stage_avj_latent_reasoning_core.py
+|   |-- omni_transformer_stage_avjb_trace_verifier.py
+|   |-- omni_transformer_stage_avjc_rl_verifier_reward.py
 |   |-- text_to_latent_sweep.py
 |   |-- text_to_latent_thought.py
 |   |-- visual_multimodal_stage_ab.py
@@ -515,6 +522,10 @@
 |   |-- archive/
 |   |   `-- README-2026-07-04-legacy-command-list.md
 |   |-- DIRECTORY_REFERENCE.md
+|   |-- Project-Yggdrasil 未来多模态潜空间智能体架构.md
+|   |-- Project-Yggdrasil 多模态潜变量推理架构白皮书 V2.md
+|   |-- Project-Yggdrasil V2 从架构验证到商用路线图.md
+|   |-- project-yggdrasil-latent-reasoning-architecture-review-2026-07-11.md
 |   |-- experiment-general-lessons.md
 |   |-- feasibility-report.md
 |   |-- next-stage-test-plan.md
@@ -573,6 +584,10 @@
 |   |-- omni-transformer-stage-avg-strict-staged-10m-training.md
 |   |-- omni-transformer-stage-avh-text-anchored-visual-edit.md
 |   |-- omni-transformer-stage-avi-whole-image-latent-capacity.md
+|   |-- omni-latent-reasoning-route-and-goals.md
+|   |-- omni-transformer-stage-avj-latent-reasoning-core.md
+|   |-- omni-transformer-stage-avjb-trace-verifier.md
+|   |-- omni-transformer-stage-avjc-rl-verifier-reward.md
 |   |-- text-to-latent-thought-experiment.md
 |   |-- visual-multimodal-stage-ab-experiment.md
 |   |-- visual-multimodal-stage-c-experiment.md
@@ -583,7 +598,10 @@
 |       `-- core.py
 `-- tests/
     |-- test_architecture_feasibility.py
-    `-- test_stage_aj_checkpointing.py
+    |-- test_stage_aj_checkpointing.py
+    |-- test_stage_avj_latent_reasoning_core.py
+    |-- test_stage_avjb_trace_verifier.py
+    `-- test_stage_avjc_rl_verifier_reward.py
 ```
 
 ## 快速查找
@@ -591,10 +609,15 @@
 | 想找什么 | 看哪里 |
 | --- | --- |
 | 项目简短介绍、近期图像生成/编辑成果、Stage E+F 多模态融合成功结果、目标路线和初步证明 | `README.md` |
-| 多模态潜空间架构是否可行 | `docs/feasibility-report.md` |
-| 下一阶段测试任务规划、挑战矩阵、通过门槛和旧路线收口规则 | `docs/next-stage-test-plan.md` |
+| 当前 V2 多模态潜变量推理架构的正式定义 | `docs/Project-Yggdrasil 多模态潜变量推理架构白皮书 V2.md` |
+| 从架构验证、完整版到客户试点和商用 GA 的总路线 | `docs/Project-Yggdrasil V2 从架构验证到商用路线图.md` |
+| V2 的关键架构决策是如何形成的 | `docs/project-yggdrasil-latent-reasoning-architecture-review-2026-07-11.md` |
+| 原始 V1 白皮书提出过什么历史设想 | `docs/Project-Yggdrasil 未来多模态潜空间智能体架构.md` |
+| V2 之前的多模态潜空间代理实验积累了哪些可行性与负结果 | `docs/feasibility-report.md` |
+| 最近 V2-A/V2-B 测试顺序、Gate、消融与成本口径 | `docs/next-stage-test-plan.md` |
 | 当前实验中按任务线沉淀的失败、修复和通用经验 | `docs/experiment-general-lessons.md` |
-| 从 0 训练完整架构验证至少需要多少显存、量化能省多少、最低价整机买什么显卡 | `docs/from-scratch-training-vram-quantization.md` |
+| V2 之前的 AV 线为何曾回到 `external <-> latent workspace <-> latent reasoning <-> external` | `docs/omni-latent-reasoning-route-and-goals.md` |
+| 旧 from-scratch 路线的显存与量化历史评估 | `docs/from-scratch-training-vram-quantization.md` |
 | 纯文本训练迁移到特殊 latent token 内部思考是否可行 | `experiments/text_to_latent_thought.py` 与 `artifacts/text_to_latent_thought/results.json` |
 | 多 seed / 更长 move 的稳定性 | `experiments/text_to_latent_sweep.py` 与 `artifacts/text_to_latent_thought/sweep_results.json` |
 | 更接近多模态架构的连续潜变量管线 | `experiments/multimodal_latent_pipeline.py` 与 `artifacts/multimodal_latent_pipeline/` |

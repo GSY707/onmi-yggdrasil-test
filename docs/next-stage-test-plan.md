@@ -1,329 +1,270 @@
 # 下一阶段测试任务规划
 
-## 口径
+日期：2026-07-11
 
-本规划把“我们需要更多挑战，这个架构也是”理解为：下一阶段不只是提高数据规模或多跑 seed，而是要更直接地挑战架构假设本身。测试目标应从“toy 链路能跑通”升级为“单个专家或旧 baseline 不能直接解决，必须依赖统一 latent bus、主动读取、对象/计数 slot、输出专家和长程记忆共同工作”。
+架构真源：`docs/Project-Yggdrasil 多模态潜变量推理架构白皮书 V2.md`
 
-这里仍然区分两件事：
+总路线：`docs/Project-Yggdrasil V2 从架构验证到商用路线图.md`
 
-1. 架构闭环验证：证明某条结构在可控任务中有因果作用。
-2. 任务质量证明：证明真实世界任务上达到可用质量。
+当前状态：V2-A 尚未实现；本文件只冻结最近两部分实验，不提供不存在的训练命令或结果。
 
-下一阶段优先做前者，但任务必须比现有 Stage AM/AJ 更难；不能把低熵饱和任务继续拉长训练后当成新证据。
+## 1. 路线直接切换
 
-## 当前基线
+当前路线不再继续 AV-J-D，也不继续给 AV-J/AV-J-B/AV-J-C 的 record reward、candidate mask 或 no-source shortcut 打补丁。
 
-已经比较强的正信号：
+旧 Stage A—AV-J-C 保留为代理实验历史，最高只能提供 mechanism/surrogate 证据。新的当前主线从 V2-A 开始：
 
-- Stage AM：结构化 evidence 上，cell/count/pair 统一 latent bus + count 输入专家 + decoded position compare 后，四任务 all-task answer 达到 98.24%。
-- Stage AN：同一统一 bus 接 answer-token writer 后，3 seed 平均 answer-token sequence exact 达到 98.11%，证明统一 bus 不只支撑分类头。
-- Stage AQ：加入 relation delta 与 deterministic truth-table 过程状态，并把 truth-table state 强注入 answer writer 后，3 seed relation sequence exact 达到 99.74%，no-evidence relation truth-table 为 50.52%。
-- Stage AK/AL：relation-only 的 object/pair latent bus、query retrieval、compare 和 yes/no answer writer 已接近 99%-100%。
-- Stage AJ/AP：Transformer patch 输入到 latent 再完整重绘的链路能跑；copy-only 辅助监督正式单 seed 达到 100% scene exact；edit/generation 正式单 seed 达到 99.02%/100% scene exact。
-- Stage E/F/I/J/K：多模态 shared latent、工具历史、memory、UI/DOM 和 audit loop 在合成环境中可以闭合。
+1. **V2-A：推理介质。**比较显式文本思维链、单向量 latent recurrence 和多向量 latent recurrence。
+2. **V2-B：多模态与双层 MoE。**使用 V2-A 胜出介质，验证 Boundary-MoE、FFN-MoE 和文本/视觉/动作融合。
 
-仍然没有证明的部分：
+在 V2-A 正式通过前，不实现 V2-B；在 V2-B 通过前，不加入工作树运行层、长期记忆、主动采样、渐进生成或离线专家晋升。
 
-- Stage AM 还只是结构化合成 evidence，不证明真实视觉计数或 detector/segmentation 到 count slots。
-- Stage AM 已由 Stage AN 补上 answer-token writer 门禁，但仍是结构化 evidence，不证明真实语言生成能力。
-- Stage AM relation 只有 92.97%，Stage AN 为 92.45%；Stage AQ 已拉到 99.74%，但依赖显式 deterministic truth-table 结构偏置。
-- Stage AP 已补完 Stage AJ edit/generation 正式单 seed 长训；仍未完成 edit/generation 的多 seed 统计和更高熵图像任务。
-- 当前没有真实文件、真实 UI 页面、真实 OCR/layout、长程探索成本、局部记忆污染和工具失败恢复的综合挑战。
+## 2. 共同证据口径
 
-## 总原则
+### 2.1 证据等级
 
-每个新测试都必须同时有这些门禁：
+- `smoke`：前后向、checkpoint、结果 JSON 或单个接口能运行；
+- `probe`：单 seed 或缩小数据的方向信号；
+- `formal`：预注册配置、多 seed、heldout、消融和成本指标齐全；
+- `architecture-fidelity`：成熟基座、连续 recurrence、无旁路、审计和专家边界符合 V2；
+- `architecture-formal`：高保真实现相对同预算强基线形成可重复优势。
 
-1. 主任务结果：answer exact、scene exact、foreground/object exact 或 episode success，不能只看 cosine、MSE 或 loss。
-2. 因果消融：no-evidence、shuffled-evidence、no-source、no-image、no-tool-history 等必须显著下降。
-3. 对照基线：direct structured baseline、oracle/strong expert baseline、旧架构 baseline 至少保留一个。
-4. 稳定性：除快速 smoke 外，正式结论默认至少 3 seeds；长训任务可先 1 seed 方向验证，但必须标成 probe。
-5. 证据落盘：每轮必须写 JSON、样例 PNG/HTML/PDF 或 trace，并同步实验报告和 `docs/DIRECTORY_REFERENCE.md`。
-6. 失败也要可用：失败实验必须给出下一步决策，不允许只留下“可能调参可修”的模糊结论。
+### 2.2 所有实验必须报告
 
-## 优先级矩阵
+- 参数量：冻结参数、可训练参数和 active parameters 分开；
+- 数据量：unique tokens/examples 与 processed tokens 分开；
+- 质量：最终 exact/episode success、heldout、长度外推和分任务指标；
+- 因果：no/shuffled input、no/shuffled latent、截短 trajectory 和必要 modality 消融；
+- 成本：训练时间、推理延迟、采样次数、latent transitions、峰值显存、KV/激活和估算 FLOPs；
+- 稳定性：smoke 之外至少记录 seed，formal 默认 3 seeds；
+- 恢复：latest/best checkpoint、resume、设备、schema version 和中断原因；
+- 边界：失败原因、未测试项和不能外推的能力。
 
-| 优先级 | 测试任务 | 挑战的架构假设 | 最小可执行形态 | 通过门槛 | 失败后处理 |
-| --- | --- | --- | --- | --- | --- |
-| P0 | 实验基础设施硬化 | 更长训练必须可恢复，否则无法挑战更难任务 | 给 Stage AJ/后续新脚本补 checkpoint、resume、定期样例、统一 JSON schema 和超时保护 | 中断后 resume 的最终指标与不中断 run 误差可接受；JSON 中记录 config、seed、best checkpoint、时间、设备 | 没有恢复能力前，不跑 30 分钟以上正式长训 |
-| P1 | Stage AN：Stage AM 统一 bus 接 answer-token latent writer | 统一 bus 是否能支撑文本 token latent 输出，而不是只支撑分类头 | 复用 color/shape/count/relation 四任务，把 answer writer 从分类头升级为 Stage AC 风格 answer-token latent writer | 3 seeds 平均 answer token exact >= 95%，relation >= 90%，no-evidence 下降到接近随机或明显低于 full | 如果分类头高、token writer 低，优先修输出 token 分离/contrastive，不回退到分类头 |
-| P1 | Stage AO：像素到 cell/count slots | count 输入专家是否能从真实像素或更高熵合成图像产生一等 count slots | 用合成多对象图片替代结构化 evidence，训练 detector/segmentation/counting expert 产出 cell/count/pair slots，再接 Stage AM bus | object table 或 mask IoU >= 95%，count answer >= 90%，all-task answer >= 85%，no-image/no-evidence 明显下降 | 如果 detector/count slots 不稳，先单独修专家，不把失败归因到 reasoner |
-| P1 | Stage AP：Stage AJ supervised edit/generation 正式长训 | 图像输出专家能否从 latent 完整重绘并执行编辑，而不是只 copy | 在 checkpoint/resume 后补 d_model 192、4096/512/512、edit/generate 正式单 seed，再扩到 3 seeds | copy 门禁保持 100%；edit scene exact >= 95%；no-source <= 10%；foreground/object 指标优先于全图 MSE | 若 edit 低但 copy 高，改可修改对象表；不继续拉旧无监督 `memory_tree_edit` |
-| P1 | Stage AQ：relation delta/truth-table slots | relation 是否需要显式过程状态，而不是 raw pair compare | 在 Stage AM 上加入 delta slots、truth-table/process supervision，测试 relation 从 92.97% 拉回 98%+ | 3 seeds relation answer >= 98%，no-evidence relation 不能同步升高，process probe 可读 | 若只靠 compare loss 提升，判为指标修补，不作为架构进步 |
-| P2 | Stage AR：跨专家不可单解任务 | 单个专家能 100% 时，不能证明 MoE/latent 组合价值 | 设计 image + text rule + telemetry + memory 四路任务，任意缺一路都无法答对 | full >= 90%，每个 no-modality ablation 至少下降 30 个百分点；direct all-input baseline 记录成本 | 如果 direct baseline 同等且更便宜，保留负结果，不强行宣称 latent 优势 |
-| P2 | Stage AS：真实文件证据审计 | 架构是否能处理真实文件边界和引用，而不是 synthetic DSL | 小型 HTML/PDF/CSV/截图组合，模型必须调用受控工具抽取证据并输出带引用 audit report | 引用命中率、结论准确率、工具步骤合法率均 >= 85%；no-tool-history 明显下降 | 若 OCR/layout 是瓶颈，接预训练 OCR/layout expert，不让 tiny latent 承担全部感知 |
-| P2 | Stage AT：长程局部记忆和探索成本 | memory tree/work tree 是否真的降低长任务成本 | 局部地图、遮挡、错误探测、不可重置探测成本、多目标任务，要求写 memory 并复用 | 同等预算下 memory/active-read 明显优于 no-memory；错误记忆注入后可检测或修正 | 如果只是短 horizon 100%，继续加路径长度、干扰和错误观察，不算通过 |
-| P2 | Stage AV：70M 从零集成 Micro-Omni | 不接预训练专家时，单一更大模型是否能同时承载视觉、工具和 memory 能力 | 70M 级 Transformer，从零训练，统一接 image/text/tool/memory/state，覆盖 AR/AS/AT 子任务 | overall >= 85%，每任务 >= 80%，对应 no-image/no-tool/no-memory 消融明显下降 | 若视觉子任务随机，先分阶段预训练视觉 reader，不继续只靠扩大参数量 |
-| P3 | Stage AU：预训练专家 + hard negative grounding | 真实专家接入后，latent bus 是否承载视觉/文档 grounding | DocVQA/OCR/layout/CLIP 或小型 VLM expert，加入同 prompt 风格但图像事实不同的 hard negatives | full 明显高于 text-only/CLIP-only；no-image 和 shuffled-image 必须掉分 | 如果 text-only 接近 full，任务不是 grounding 测试，重做数据集 |
+### 2.3 禁止的成功口径
 
-## P0 落地状态
+以下指标不能单独判定成功：loss、latent cosine、MSE、单次 answer accuracy、teacher-forced 指标、模型自述或更大参数量。
 
-2026-07-04 已先在 Stage AJ 图像 IO 长训脚本落地 P0 基础设施：磁盘级 `latest.pt`/`best.pt`、`--resume`、训练中样例、`schema_version=2` 的结果 JSON、CPU/GPU 设备选择、时间预算跳过保护和 `--stop-after-steps` 恢复链故障注入。验证记录见 `docs/omni-transformer-stage-aj-transformer-image-io-fidelity-experiment.md` 的 P0 小节。
+## 3. V2-A：推理介质实验
 
-后续 Stage AN/AO/AP/AQ 不应重新发明一套恢复格式；如果需要长训，应复用这套字段口径：latest 用于继续训练，best 只用于最终评估，结果 JSON 必须记录 checkpoint 目录、resume 状态、设备、seed、best checkpoint、训练步数和是否因时间/测试注入停止。
+### 3.1 V2-A0：成熟基座与任务基线
 
-## P1 已完成状态
+#### 目标
 
-2026-07-04 已完成 Stage AN、Stage AP 与 Stage AQ：
+选择一个能稳定完成任务的最小成熟文本基座，并建立公平的文本推理基线。
 
-- Stage AN：`docs/omni-transformer-stage-an-answer-token-latent-writer-prep.md`，正式结果 `artifacts/omni_transformer_stage_an_answer_token_writer/formal_results.json`，answer-token sequence exact 98.11%，relation sequence exact 92.45%。
-- Stage AP：`docs/omni-transformer-stage-ap-formal-edit-generation-experiment.md`，正式结果 `artifacts/omni_transformer_stage_ap_formal_edit_generate/formal_edit_generate_result.json`，edit scene exact 99.02%，edit no-source 4.10%，text generation scene exact 100%。
-- Stage AQ：`docs/omni-transformer-stage-aq-relation-process-supervision-experiment.md`，正式通过结果 `artifacts/omni_transformer_stage_aq_relation_process_supervision/formal_results_v3.json`，relation sequence exact 99.74%，relation truth-table 100%，no-evidence relation truth-table 50.52%。
+#### 必须完成
 
-Stage AQ 的关键经验是：只加 learned truth-table head 不够；deterministic truth-table 可读但弱注入仍不够；必须把 truth-table state 作为强过程状态接入 answer writer。
+- 确定基座、tokenizer、推理模式和许可证；
+- 选择确实需要多步状态更新的纯文本任务；
+- 建 train/validation/test、composition-heldout 和 length-heldout；
+- 跑 direct answer、无显式 CoT 和显式文本 CoT；
+- 记录生成 reasoning token 数、KV、延迟和最终质量；
+- 排除模板、标签、长度和答案候选泄漏。
 
-## P2 已启动状态
+#### Gate A0
 
-2026-07-04 已完成 Stage AR 视觉中心跨专家不可单解任务：
+文本 CoT 基线在多 seed 或可重复 deterministic 配置下稳定；任务不是靠直接映射即可饱和；恢复和成本计量链可用。
 
-- Stage AR：`docs/omni-transformer-stage-ar-cross-expert-visual-experiment.md`，正式结果 `artifacts/omni_transformer_stage_ar_cross_expert_visual/formal_results.json`。
-- 3 seed 平均 latent full answer accuracy 为 100.00%，no-image / no-text-rule / no-telemetry / no-memory 消融分别降到 23.96% / 25.07% / 32.10% / 30.21%。
-- direct all-input baseline 为 51.04%，没有同等解决。
+### 3.2 V2-A1：连续 latent recurrence smoke/probe
 
-Stage AR 的结论只覆盖受控合成视觉 + 受控 DSL text-rule + 离散 telemetry/memory 的四路因果依赖；不证明真实 VLM grounding、自然语言指令跟随或长程 agent 状态。agent 状态路线保留给 Stage AT 或 AR 后续加强版。
+#### 参考结构
 
-2026-07-04 已完成 Stage AS 真实文件证据审计：
+```text
+成熟文本基座（完全冻结）
+-> 输入 hidden states
+-> K 个 learned latent queries
+-> 复制基座顶部 2 个 block 的独立 recurrent reasoner
+-> 固定 T 次 latent transition
+-> 只读最终 latent 的答案头
+```
 
-- Stage AS：`docs/omni-transformer-stage-as-file-audit-experiment.md`，正式结果 `artifacts/omni_transformer_stage_as_file_audit/formal_results.json`。
-- 3 seed 平均 conclusion accuracy、citation accuracy、report exact、tool step legality 均为 100.00%。
-- no-tool-history conclusion accuracy 为 25.00%，相对 full 下降 75.00 个百分点。
+第一版固定：
 
-Stage AS 的结论覆盖真实落盘 HTML/CSV/PDF/截图文件和受控工具读取链路；不证明复杂 PDF layout、OCR、开放网页审计或自由规划型 tool-use agent。
+| 参数 | 起始值 |
+| --- | --- |
+| `D_latent` | 基座 residual width |
+| `K` | 8 |
+| `T` | 8 |
+| recurrent blocks | 2 |
+| FFN | Dense |
+| 基座 | 完全冻结 |
+| 输出 | 单文本答案专家 |
+| audit readout | 暂不联合训练 |
 
-2026-07-04 已完成 Stage AT 长程局部记忆和探索成本任务：
+#### Gate A1
 
-- Stage AT：`docs/omni-transformer-stage-at-memory-exploration-experiment.md`，正式结果 `artifacts/omni_transformer_stage_at_memory_exploration/formal_results.json`。
-- 3 seed 平均 episode success 为 100.00%，强 no-memory oracle episode success 为 0.00%，success gap 为 100.00 个百分点。
-- full mean scans 为 4.00，no-memory oracle mean scans 为 10.00；full mean cost 为 38.00，no-memory oracle mean cost 为 47.96。
-- corrupt-memory success 为 99.93%，corrupt-memory correction rate 为 99.80%。
+前后向、checkpoint/resume、无答案旁路、固定 `K/T` 的任务学习和结果 schema 均通过；该 Gate 只证明机制可训练，不提供介质优越性结论。
 
-Stage AT 的结论覆盖受控局部地图、遮挡 zone、主动 scan/write memory、多目标复用和错误 memory 修正；不证明真实导航、真实视觉 SLAM、开放式 memory tree 自动扩展或自由规划型长期 agent。
+### 3.3 V2-A2：`K/T` 容量—步骤曲线
 
-2026-07-04 已启动 Stage AV 70M 从零集成 Micro-Omni，当前是中间负结果，不进入正式 3 seed：
+#### 对照
 
-- Stage AV：`docs/omni-transformer-stage-av-from-scratch-micro-omni-experiment.md`，probe 结果 `artifacts/omni_transformer_stage_av_from_scratch_micro_omni/probe_70m_residual_results.json`。
-- 70M 档配置为 `d_model=768`、`layers=10`、`heads=12`、`latent_tokens=8`，参数量 70,994,707；本机 RTX 4070 Laptop 8GB 上 probe 峰值 CUDA allocated 约 1,810.62 MB。
-- probe overall answer accuracy 为 64.32%，memory exploration 为 100.00%，file-audit tools 为 69.53%，cross-expert visual 只有 23.44%。
-- `no_tool_history` 从 64.32% 降到 32.68%，`no_memory` 降到 31.77%；但 `no_image` 基本不降，视觉 grounding 未闭合。
+1. A0：显式文本 CoT；
+2. A1：`K=1` 单向量 recurrence；
+3. A2：`K=4/8/16` 多向量 recurrence；
+4. 固定 `T=8` 扫 `K`；
+5. 选择合适 `K` 后扫 `T=2/4/8/16`；
+6. 固定步数与计算匹配两种口径。
 
-Stage AV 说明“本机训练 70M 级从零集成模型”可行，但“单阶段多任务自然学会视觉+工具+memory”未证明。下一步不应直接扩大参数或跑 3 seed，应先分阶段预训练视觉 zone/color reader，再接统一 answer head。
+#### 必须消融
 
-2026-07-04 已切换 Stage AV-B 分阶段潜空间训练方案，并完成 smoke：
-
-- Stage AV-B：`docs/omni-transformer-stage-avb-staged-latent-training.md`，脚本 `experiments/omni_transformer_stage_avb_staged_latent_training.py`。
-- 训练顺序改为 `text_base -> image_translate -> tool_memory_translate -> latent_reason -> joint`。
-- 70M batch 256 smoke 参数量为 71,025,455，峰值 CUDA allocated 约 3,094.87 MB，说明本机 8GB 显存仍有余量。
-- 长训建议由用户本地启动，优先用 batch 256；若 `nvidia-smi -l 2` 显示长期低于 60W，再提到 384/512。
-
-Stage AV-B 目前只有 smoke，没有能力结论。它替代 AV v0 继续推进，AV v0 作为“单阶段端到端不自然闭合视觉 grounding”的负结果保留。
-
-用户本地已完成 Stage AV-B long probe：
-
-- 结果：`artifacts/omni_transformer_stage_avb_staged_latent_training/long_result.json`。
-- overall answer accuracy 为 74.61%，未达到 85% 门槛。
-- `file_audit_tools` 为 95.01%，`memory_exploration` 为 100.00%，但 `cross_expert_visual` 只有 28.95%。
-- `no-tool-history` 降到 14.16%，说明工具历史有因果作用；但 `no-image` 为 73.93%、`shuffled-image` 为 74.61%，几乎不降，说明视觉 grounding 未进入最终答案。
-- unique train tokens 约 516k，processed tokens 约 87.1M，主要是反复重采样小数据集。
-
-判断：Stage AV-B long probe 不通过。下一步不继续对小数据加步数，应接 Stage AV-C sharded dataset pipeline，并处理 image translator 遗忘。
-
-2026-07-04 已补 Stage AV-C 大规模合成数据流水线 smoke：
-
-- Stage AV-C：`docs/omni-transformer-stage-avc-dataset-pipeline.md`，脚本 `experiments/omni_transformer_stage_avc_dataset_pipeline.py`。
-- 当前样本长度为 63 tokens；1B token 约需 15,873,015 examples。
-- smoke 数据集 `artifacts/omni_transformer_stage_avc_dataset_pipeline/smoke_dataset/manifest.json` 包含 1,408 examples、88,704 tokens，验证了 train/val/test/heldout sharded `.pt` 输出。
-- 结论：AV-B 不能继续用几千条小数据长训做结论；下一步应让训练脚本接 `--dataset-manifest`，先跑 10M token 级别，再考虑 100M/1B。
-
-Stage AV-C 目前只完成数据生成流水线，没有训练结论。
-
-2026-07-05 已补 Stage AV-D 1B-first 数据集设计：
-
-- Stage AV-D：`docs/omni-transformer-stage-avd-1b-first-dataset-design.md`。
-- 新口径是先设计 1B token 母分布，再定向裁剪 10M token probe；10M 不是随机缩小版，而是保留关键结构、降低文本/schema/horizon 等部分熵。
-- 已根据用户纠正把“模态翻译”改成“外部表征 ↔ latent 双向互译”，并在 1B/10M 配比里加入 `bidirectional_translation` 数据块。
-- AV-C 当前生成器只保留为 shard/manifest 输出链路 smoke，不作为正式数据分布。
-- 下一步应新增 AV-D generator，支持 `--scale 10m|100m|1b`，但先只生成 10M，并让 AV-B 从 `--dataset-manifest` 读取。
-
-2026-07-05 已新增 Stage AV-E 双向互译 smoke/probe：
-
-- Stage AV-E：`docs/omni-transformer-stage-ave-bidirectional-latent-external.md`，脚本 `experiments/omni_transformer_stage_ave_bidirectional_latent_external.py`。
-- 链路为 `source external -> source latent -> target external` 与 `target external -> target latent -> source external`，同时训练 source/target reconstruction、双向 translation、latent alignment 和 answer。
-- 小 probe 中 source-to-target token accuracy 为 28.40%，target-to-source token accuracy 为 28.24%，answer 仍接近随机，sequence exact 为 0。
-- 结论：AV-E 方向更贴近架构理念，但当前只是早期负/诊断结果；不能用 latent cosine 代替外部互译 exact。
-
-2026-07-05 已准备 Stage AV-F 10M 级双向互译数据集和 AV-E manifest 训练入口：
-
-- Stage AV-F：`docs/omni-transformer-stage-avf-10m-bidirectional-dataset.md`，脚本 `experiments/omni_transformer_stage_avf_10m_bidirectional_dataset.py`。
-- 10M manifest：`artifacts/omni_transformer_stage_avf_10m_bidirectional_dataset/dataset_10m/manifest.json`。
-- 数据规模为 184,000 examples、10,120,000 pair tokens、train unique pair tokens 8,800,000。
-- AV-E 训练脚本已支持 `--dataset-manifest`、`--gpu-resident-data`、checkpoint/resume 和 batched eval。
-- 70M AV-E capacity smoke：75,970,770 参数；batch 256 峰值 CUDA allocated 约 4,753.32 MB，batch 512 峰值约 8,923.00 MB。
-- 结论：10M 级训练入口已准备好；下一步应由用户启动长训，能力判断必须看互译 sequence exact 和 source/target 双向指标，不只看 answer accuracy。
-
-2026-07-05 已补 Stage AV-G 严格分阶段 10M 训练入口：
-
-- Stage AV-G：`docs/omni-transformer-stage-avg-strict-staged-10m-training.md`，脚本 `experiments/omni_transformer_stage_avg_strict_staged_10m_training.py`。
-- AV-G 不触碰正在跑的 AV-E joint baseline；输出和 checkpoint 独立在 `artifacts/omni_transformer_stage_avg_strict_staged_10m_training/`。
-- 默认 schedule 为 `text_latent_base 400 -> external_codec 1200 -> bidirectional_translate 2200 -> latent_reason 1400 -> joint_debug 800`。
-- 已做 CPU smoke 和 CPU resume smoke，验证 stage 切换、manifest IO、checkpoint/resume 和结果 JSON。
-- 没有在本轮跑 70M CUDA smoke，避免抢正在运行的 AV-E 10M 训练 GPU。
-- 后续严格架构路线应以 AV-G 为准；AV-E 当前长训保留为 joint baseline/负对照。
-
-2026-07-05 用户本地完成 AV-E joint baseline 和 AV-G strict staged 两批 10M 长训：
-
-- AV-E joint：`artifacts/omni_transformer_stage_ave_bidirectional_latent_external/train_10m_70m_result.json`。
-- AV-G strict：`artifacts/omni_transformer_stage_avg_strict_staged_10m_training/train_10m_70m_strict_result.json`。
-- 两批都是 75,970,770 参数、AV-F 10M manifest、batch 256、6000 steps、processed pair tokens 84,480,000。
-- AV-E joint 最终 answer test accuracy 为 97.25%，但四个互译 sequence exact 全为 0；判为 answer shortcut，不通过。
-- AV-G strict 最终 answer test accuracy 为 77.85%，四个互译 sequence exact 仍全为 0；严格 schedule 没有修复 external codec。
-- 两批 token accuracy 均平台在约 72%-74%；按位置诊断显示 task/tool/memory 等低熵位置接近 100%，但 image zone color 和 variable text positions 只有约 30%-34%。
-- 结论：下一步不应继续扩大同一 AV-E/AV-G 配置，而应新增 decoder/codec 修复实验。当前 `decode(latent)` 的 mean-pool latent + position query 不足以绑定每个可变字段。
-
-2026-07-05 已改走 Stage AV-H 文本锚定视觉编辑数据集和训练入口：
-
-- Stage AV-H：`docs/omni-transformer-stage-avh-text-anchored-visual-edit.md`。
-- 数据集脚本：`experiments/omni_transformer_stage_avh_text_anchored_visual_edit_dataset.py`。
-- 训练脚本：`experiments/omni_transformer_stage_avh_text_anchored_visual_edit_training.py`。
-- 10M manifest：`artifacts/omni_transformer_stage_avh_text_anchored_visual_edit_dataset/dataset_10m/manifest.json`。
-- 数据规模：21,900 examples、10,030,200 tokens、train unique tokens 8,244,000。
-- 任务链路为 source text + source image + edit instruction -> target text -> target object record -> target image，避免 AV-F 无文本锚点高熵互译。
-- 68M capacity smoke：68,416,419 参数，batch 128，peak CUDA allocated 6,537.45 MB。
-- 2026-07-05 已修 AV-H 训练性能：移除每步 GPU->CPU 同步点、按 stage 裁剪输出头、缓存 record 渲染常量，并新增 `--micro-batch-size` 与 `--optimizer` 开关。
-- 68M perf-fix smoke：effective batch 128、micro batch 64、Adafactor，10 step peak CUDA allocated 4,893.83 MB，训练窗口 1.52 step/s。
-- 已做 dataset smoke、training CPU smoke、10M loader smoke、CUDA capacity smoke 和 perf-fix smoke；下一步可用 micro batch 64 启动 AV-H 10M 长训。
-
-用户本地已完成 AV-H 10M 长训：
-
-- 结果：`artifacts/omni_transformer_stage_avh_text_anchored_visual_edit_training/train_10m_68m_result.json`。
-- 成本：68,416,419 参数、6,000 steps、processed tokens 351,744,000、elapsed 3,502.67 sec、peak CUDA allocated 4,894.82 MB。
-- 原始 result JSON 旧口径 `joint_debug` 指标显示 test target record exact 95.77%、heldout 92.69%，但该模式输入包含 `target_record`，有 teacher-forcing / copy 泄漏，不能算端到端通过。
-- 已补诊断：`artifacts/omni_transformer_stage_avh_text_anchored_visual_edit_training/train_10m_68m_stage_mode_diagnostic.json`。
-- 非泄漏关键指标：`joint_no_target_record` target record exact test 19.38%、heldout 1.46%；`image_ground` source record exact test 1.69%、heldout 0.00%；target text exact 仍接近 0。
-- 样例 contact sheet 显示预测图像有颜色/位置弱信号，但明显模糊，不能只看 MSE。
-- 结论：AV-H 10M 不通过。它提供了 teacher-forced record/image output 上限信号，但没有证明文本/图像到 target record、source image grounding 和端到端图像编辑链路。
-- 训练脚本已修正后续评估口径：兼容主指标映射到 `joint_no_target_record`，并保留 `joint_teacher_record` 作为 teacher-forced 上限。
-
-2026-07-05 已新增 Stage AV-I 整图 latent token 容量诊断：
-
-- Stage AV-I：`docs/omni-transformer-stage-avi-whole-image-latent-capacity.md`。
-- 脚本：`experiments/omni_transformer_stage_avi_whole_image_latent_capacity.py`。
-- 设计：整图 encoder -> latent token bank -> 整图 decoder，不切 patch；黑色背景转透明 alpha，RGB loss 只算对象像素，alpha loss 监督全图透明度；ordered prefix 按短到长 curriculum 解锁，greedy prefix 选择最小透明整图重建 loss 的 token，不再使用前景交集。
-- CUDA smoke：`artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/transparent_curriculum_cuda_smoke_v2_result.json`。
-- 12/24/32 的 3000-step 全 train probe：`artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_transparent_curriculum_12_24_32_3000step_result.json`，汇总 `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_transparent_curriculum_12_24_32_3000step_summary.json`。
-- 结果：12 token ordered final 的 test transparent loss 0.002505、object RGB MSE 0.002271、alpha IoU 0.9972；24/32 没有优于 12，后续 token 在 2 token 后边际收益很小。
-- 已修正脚本：`d_model` 不再必须同时表示 encoder hidden width 和 latent token width；新参数 `latent_dim`、`encoder_width`、`decoder_width` 可单独控制，避免 token 数被单 token 宽度掩盖。
-- 2 维 token 极限 probe：`artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_tokens_1_2_4_8_16_32_64_3000step_result.json`，汇总 `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_tokens_1_2_4_8_16_32_64_3000step_summary.json`。
-- 2 维结果：1/2/4/8/16/32 token 的 test alpha IoU 从 0.6213 升到 0.8166，说明从 1 开始的 token 容量曲线有效；但即使 32 token、64 个 latent scalars，也远不如 `latent_dim=192, latent_tokens=12`，且样图有明显 ghost/object 混叠。
-- 已加入 compact prefix guidance：对未达到最终 token 数的 prefix 加 `0.5 * occupied_alpha_area + 0.5 * (1 - target_alpha_coverage)`，引导前序 token 少占面积但尽量覆盖目标区域。
-- compact + 7000-step probe：`artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_compact_tokens_1_2_4_8_16_32_64_7000step_result.json`，汇总 `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_compact_tokens_1_2_4_8_16_32_64_7000step_summary.json`。
-- compact 结果：32 token 最好，test transparent loss 0.044031、object RGB MSE 0.029897、alpha IoU 0.9091；64 token alpha IoU 0.9074，接近但未超过 32。相比无 compact 3000-step，32 token alpha IoU 从 0.8166 升到 0.9091。
-- 已加入 precision compact：coverage 奖励从线性 `x` 改成 `x^n`，`n` 默认从 1 线性增到 4，用来减少半透明/低置信覆盖的奖励。
-- precision compact probe：`artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_precision_compact_tokens_1_2_4_8_16_32_64_7000step_result.json`，汇总 `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_precision_compact_tokens_1_2_4_8_16_32_64_7000step_summary.json`。
-- precision compact 结果：16 token 最好，test transparent loss 0.042794、object RGB MSE 0.030811、alpha IoU 0.9117；4/8/16 token 优于线性 compact，但 32/64 token 比线性 compact 变差。
-- 已修正 precision schedule：`n` 在每个 active-token curriculum 段内都重新从 0.5 到 5，使用两端快、中间慢的非线性曲线。
-- segment precision compact probe：`artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_segment_precision_compact_tokens_1_2_4_8_16_32_64_7000step_result.json`，汇总 `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_segment_precision_compact_tokens_1_2_4_8_16_32_64_7000step_summary.json`。
-- segment precision compact 结果：32 token 综合最好，test transparent loss 0.037481、object RGB MSE 0.024237、alpha IoU 0.9127；64 token alpha IoU 最高，test 0.9221、heldout 0.9103，但 object RGB MSE 和综合 loss 比 32 差。
-- 2026-07-06 已把 AV-I 脚本切到 `schema_version=5`：compact prefix guidance 改为最大化前景正确像素，惩罚背景误涂、前景颜色错误和漏前景；相邻 prefix 新增 residual routing loss，要求后续 prefix 保留前序正确像素、限制正确区域外 delta、优先修正前序错误像素。
-- correct-pixel residual CPU smoke：`artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/correct_pixel_residual_cpu_smoke_result.json`，验证新 loss、history、soft/hard correct pixel 指标、residual 指标和样例输出链路可跑。
-- correct-pixel residual 正式 probe：`artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_correct_pixel_residual_tokens_1_2_4_8_16_32_64_7000step_result.json`，汇总 `artifacts/omni_transformer_stage_avi_whole_image_latent_capacity/probe_latent_dim2_correct_pixel_residual_tokens_1_2_4_8_16_32_64_7000step_summary.json`。
-- correct-pixel residual 结果：本轮不通过。16 token 是本轮最佳，test loss 0.057707、object RGB MSE 0.030764、soft/hard correct pixel 0.4757/0.4139；64 token 只有 alpha IoU 最高 0.8665，但 test loss 0.081500、object RGB MSE 0.050253、soft/hard correct pixel 0.3534/0.2455，wrong color 0.4885。与上一轮 segment precision compact 相比，16/32/64 的公共指标全部退化。
-- 结论：当前 AV-H 渲染图对宽 token 低熵，但对 2 维 token 仍有容量压力。分段 precision compact 仍是当前最好基线；第一版 correct-pixel residual 权重组合失败，下一步应修 loss/schedule，先把 correct/wrong pixel 保留为指标，再弱化或分阶段启用 wrong-color / residual delta，并补 scene/record inverse 指标和更高熵图像；只有 token 增加收益趋平且仍不能复原时，再进入参数量 sweep。
-
-2026-07-06 已把 AV 线主目标重新收口为“先打通潜空间思考”：
-
-- 路线文档：`docs/omni-latent-reasoning-route-and-goals.md`。
-- 当前目标不是继续追 AV-H/AV-I 图像编辑或整图重建，而是先证明 `external <-> latent workspace <-> latent reasoning <-> external` 的闭环。
-- 图像由我们自己构造，teacher/parser/renderer/trace 都可作为训练期监督；但推理期不能输入 teacher trace，也不能把 target record 作为泄漏输入。
-- 下一阶段建议走 Stage AV-J：先用 `scene_record + text + operation + teacher trace` 训练 latent workspace、active read/process state 和 target record/answer，不把像素图作为第一主任务。
-- AV-J 通过门槛必须同时看 source/target record exact、answer exact、trace/read accuracy、teacher-free eval 和 no-source/no-operation/no-trace 消融；answer 单独高不算通过。
-- 图像外设应在 AV-J 后接入：先验证 `record -> image` 与 `image -> latent -> record` 的双向翻译，再进入图像编辑/生成。
-
-2026-07-06 已准备 Stage AV-J 潜空间状态推理核心训练入口，停在大型训练前：
-
-- Stage AV-J：`docs/omni-transformer-stage-avj-latent-reasoning-core.md`。
-- 脚本：`experiments/omni_transformer_stage_avj_latent_reasoning_core.py`。
-- 任务从单点问答升级为 record 级状态变换：`conditional_recolor`、`same_row_move`、`count_delete_or_add`。
-- 模型输入 `source scene record + text operation`，输出 `target scene record + answer tokens`，并监督 `read_a/read_b/edit_slot/condition/edit_action/edit field` teacher trace；推理期不输入 teacher trace。
-- 已完成 CPU smoke、CPU resume smoke、CUDA capacity smoke 和单元测试 `tests/test_stage_avj_latent_reasoning_core.py`。
-- CUDA smoke 使用 `d_model=192/layers=3/heads=4/batch=128`，参数量 4,863,087，只证明 AMP、GPU resident data、checkpoint 和 eval variants 可跑，不提供能力结论。
-- 70M 档已修正为 `d_model=480/layers=8/heads=8`，参数量 71,694,351；batch256 2-step capacity 通过，peak CUDA allocated 约 4,629.29 MB。
-- `d_model=768/layers=10/heads=12` 在 AV-J 当前结构下约 225.8M，不是 70M；batch512 20-step capacity 在本轮 180 秒工具窗口内未完成，未产出 JSON。
-- 文档中已给出修正后的 70M 训练命令和 70M batch256 20-step capacity 命令；大型训练由用户启动。
-
-用户本地已完成 AV-J 70M 长训：
-
-- 结果：`artifacts/omni_transformer_stage_avj_latent_reasoning_core/train_70m_result.json`，汇总 `artifacts/omni_transformer_stage_avj_latent_reasoning_core/train_70m_summary.json`。
-- 成本：71,694,351 参数、17,000 steps、elapsed 2,982.64 sec、peak CUDA allocated 5,007.75 MB。
-- test full source record exact 99.78%，target record exact 67.77%，answer sequence exact 98.78%。
-- heldout full source record exact 99.95%，target record exact 67.19%，answer sequence exact 98.97%。
-- test read_a/read_b/edit_slot 为 91.46% / 72.22% / 71.19%，condition/edit_action 为 98.51% / 99.66%。
-- test no_source target record exact 8.62%，no_operation target record exact 0.00%，no_process target record exact 11.74%；但 no_source/no_process answer sequence exact 仍有 86.13% / 80.32%。
-- 分任务 target record exact：conditional_recolor 约 91%，same_row_move 约 62%，count_delete_or_add 约 50%。
-- 结论：AV-J 70M 不通过。source codec、operation 条件和 answer token 已学会，但 target record 状态改写未闭合，answer head 有明显模板/动作捷径。下一步应做 AV-J-B：弱化/后移 answer loss，增加 per-slot edit delta / copy-vs-update gate，强化 read_b/edit_slot hard negative，并把 count add/delete 拆成显式 count、delete slot、insert cell 过程态。
-
-2026-07-06 已准备 Stage AV-J-B 长链 trace / verifier 训练入口，停在大型训练前：
-
-- Stage AV-J-B：`docs/omni-transformer-stage-avjb-trace-verifier.md`。
-- 脚本：`experiments/omni_transformer_stage_avjb_trace_verifier.py`。
-- AV-J-B 复用 AV-J 的 record/text 数据分布，但加入 same-row candidate mask、count value、copy-vs-update gate、字段级 target accuracy、record verifier，并把 answer loss 后移且默认降到 0.05。
-- 新 schedule 为 `codec -> trace_sft -> target_verifier -> joint`，目标是用 oracle solver 生成的结构化 trace 引导模型形成自己的 latent chain，而不是继续背 answer 模板。
-- 已完成 `tests/test_stage_avjb_trace_verifier.py`、CPU smoke、CPU resume smoke、CUDA smoke 和 70M batch256 2-step capacity。
-- 70M 档配置仍为 `d_model=480/layers=8/heads=8`，参数量 72,161,403；batch256 2-step capacity peak CUDA allocated 约 4,628.25 MB。
-- 文档中已给出 AV-J-B 70M 长训命令；大型训练由用户启动。
-
-用户本地已完成 AV-J-B 70M 长训：
-
-- 结果：`artifacts/omni_transformer_stage_avjb_trace_verifier/train_70m_result.json`，汇总 `artifacts/omni_transformer_stage_avjb_trace_verifier/train_70m_summary.json`。
-- 成本：72,161,403 参数、20,000 steps、elapsed 4,331.86 sec、peak CUDA allocated 5,014.52 MB。
-- test full source record exact 99.58%，target record exact 69.48%，answer sequence exact 98.71%。
-- heldout target record exact 68.92%，answer sequence exact 98.58%。
-- test candidate mask exact 41.76%，count value accuracy 97.39%，copy gate accuracy 96.91%，verifier accuracy 83.52%。
-- test no_source target record exact 23.71%，no_process target record exact 11.60%；但 no_source/no_process answer sequence exact 仍有 85.38% / 66.99%。
-- 分任务 target record exact：conditional_recolor 87.85%，same_row_move 71.65%，count_delete_or_add 48.93%。
-- 结论：AV-J-B 70M 不通过。相比 AV-J，test target record exact 只提升约 1.71 个百分点；count/copy 辅助头能学，但 candidate mask 没闭合，answer shortcut 仍存在。下一步不应继续用 answer 高分当方向信号，应做 AV-J-C：answer loss 先置 0，修 candidate mask 的监督和类别不平衡，显式训练 slot selection/delete/insert 状态变换，再恢复 answer writer。
-
-2026-07-07 已准备 Stage AV-J-C RL / verifier reward 训练入口：
-
-- Stage AV-J-C：`docs/omni-transformer-stage-avjc-rl-verifier-reward.md`。
-- 脚本：`experiments/omni_transformer_stage_avjc_rl_verifier_reward.py`。
-- AV-J-C 复用 AV-J-B 结构，但把后半段切成采样 target record / candidate / count 的 self-critical policy-gradient reward；reward 使用 oracle verifier，baseline 使用 greedy reward，answer loss 默认 0。
-- 已完成 `tests/test_stage_avjc_rl_verifier_reward.py`、CPU smoke、CPU resume smoke 和 70M batch256 RL 2-step capacity。
-- 70M capacity 仍为 72,161,403 参数，batch256 直接进 RL 阶段 peak CUDA allocated 约 3,279.69 MB。
-- 建议优先从 `artifacts/omni_transformer_stage_avjb_trace_verifier/train_70m_checkpoints/latest.pt` 初始化，只跑 AV-J-C RL 阶段，先看 target record / candidate mask 是否突破 AV-J-B 平台。
-
-用户本地已完成 AV-J-C 两条 70M 长训：
-
-- checkpoint->RL：`artifacts/omni_transformer_stage_avjc_rl_verifier_reward/rl_from_avjb_70m_result.json`，汇总 `artifacts/omni_transformer_stage_avjc_rl_verifier_reward/rl_from_avjb_70m_summary.json`。
-- 从头 SFT+RL：`artifacts/omni_transformer_stage_avjc_rl_verifier_reward/train_70m_result.json`，汇总 `artifacts/omni_transformer_stage_avjc_rl_verifier_reward/train_70m_summary.json`。
-- checkpoint->RL test target record exact 为 75.24%，heldout 77.25%，相比 AV-J-B test 69.48% 提升约 5.76 个百分点；但 candidate mask exact 只有 43.44%，no-source target exact 升到 31.47%。
-- 从头 SFT+RL test target record exact 为 65.87%，heldout 67.58%，低于 AV-J-B；candidate mask exact 仍 43.44%，no-source target exact 升到 40.28%。
-- 结论：AV-J-C 当前实现不通过。record-level RL reward 有真实信号，但 reward 太粗，未修 candidate selection，且 no-source shortcut 变强。下一步不应继续延长同一 reward，应做 AV-J-D：任务族/步骤级 edit rollout reward，并把 no-source/no-process penalty 纳入训练 reward。
-
-## 推荐执行顺序
-
-1. P0 已先在 Stage AJ 落地；后续长训脚本要复用同一恢复与结果 schema。
-2. Stage AN 和 Stage AQ 已完成；继续维护它们作为 Stage AM 代码路径的统一 bus / token writer / relation process 基线。
-3. Stage AP 已完成正式单 seed；图像输出路线下一步应转向多 seed 或更高熵图像任务。
-4. Stage AO 已完成后，Stage AR 已先验证视觉中心四路专家因果依赖，Stage AS 已验证小型真实文件边界和引用审计链路，Stage AT 已验证受控长程局部记忆的探索成本收益。
-5. Stage AV 已证明 70M 本机从零训练可承受，但单阶段集成未通过；Stage AV-B 到 AV-G 证明“分阶段”和“互译”方向必要，但 external codec/translation exact 没闭合。
-6. AV-H/AV-I 保留为图像外设与 latent token 容量诊断，不再作为当前主线。AV-J、AV-J-B 与 AV-J-C 70M 均已完成但未通过；AV-J-C 证明 RL reward 有方向性但太粗。下一步应做 AV-J-D，把 reward 拆到任务族/步骤级 edit rollout，并把 no-source/no-process penalty 放进训练目标。
-7. P2 的 AR/AS/AT/AV 不要混成一个超大实验。跨专家、真实文件、长程记忆、从零集成、数据规模、预训练专家各自都有不同失败点，必须分开归因。
-
-## 旧路线收口规则
-
-这些内容保留为历史证据或负对照，但不应再作为下一阶段主线：
-
-- Stage AI 低熵单物体图像生成/编辑已经饱和，不再继续加 seed 或拉长训练。
-- 无辅助监督的 `memory_tree_copy`/`memory_tree_edit` 已经证明对象保真不足，只作为负对照；下一步不继续拉长旧配置。
-- 纯 32-slot resampler 或 Attention Pump 作为唯一信息通道的路线已经多次丢信息，不再作为默认架构候选。
-- naive MoE staged 训练已出现灾难性遗忘；没有 replay、蒸馏、冻结或正则化时不再跑同类 staged 实验。
-- 只看全图 pixel MSE、latent cosine 或 loss 的测试不再作为通过证据。
-- 废旧测试如果继续锁旧契约，应删除或改成当前契约；不要为了兼容旧设计保留过渡断言。
-
-## 担忧和不确定点
-
-1. P1 任务已经会把本机 4070 Laptop GPU 推到较长训练，checkpoint/resume 是硬前置。
-2. Stage AO 的 detector/segmentation/counting expert 如果从零训练，可能先卡在感知专家本身；需要把“专家质量不足”和“latent bus 不行”分开报告。
-3. Stage AN 可能暴露 answer-token latent collapse。即使 cosine 很高，也必须以 token exact 和 no-evidence gap 判断。
-4. Stage AS/P3 可能需要下载真实数据或预训练模型；涉及网络、缓存、HF token 和磁盘占用时要单独记录。
-5. 本规划没有承诺真实产品能力，只规划下一批能挑战架构假设的本地实验任务。
+- answer head 直读输入；
+- `no-latent`；
+- shuffled latent step；
+- trajectory 截短；
+- 关键 step intervention；
+- 隐藏文本 token 采样检查。
+
+#### Gate A2
+
+至少一个连续方案在 heldout、长度外推和多 seed 中形成稳定 Pareto 改善。若只靠更大 `K/T` 和更多计算获胜，判为容量收益，不判介质通过。
+
+### 3.4 V2-A3：自然语言 audit readout
+
+#### 训练顺序
+
+1. 冻结或大部分冻结已训练 latent reasoner；
+2. audit decoder 只读取 `H_1...H_T` 与允许的来源/阶段记录；
+3. 不提供标准答案；
+4. readout 不足时才以低权重短程联合训练。
+
+#### Gate A3
+
+- 打乱/删除关键 latent step 会同步破坏思维链和结果；
+- readout 中间判断能预测后续 state/动作/答案；
+- 受控干预产生方向一致变化；
+- `no-latent` 与 `shuffled-latent` 明显下降；
+- readout 不只是复述问题或最终答案。
+
+### 3.5 V2-A4：architecture-fidelity formal
+
+#### 正式配置要求
+
+- 预注册基座、数据、`K/T`、学习率、冻结矩阵和 seeds；
+- 同基座文本 CoT、direct 和 latent 对照；
+- 至少 3 seeds；
+- heldout、长度外推、消融、audit 和成本齐全；
+- 原始文本能力 retention 套件；
+- latest/best checkpoint 与可复现实验 manifest。
+
+#### V2-A 通过标准
+
+连续 latent recurrence 同时满足：
+
+1. 无离散隐藏 CoT 和答案旁路；
+2. 最终质量不低于强文本基线，或在同成本下有实质提升；
+3. 在同质量下具有可重复成本优势，或在同成本下具有可重复质量优势；
+4. 多向量容量收益与介质收益被分开报告；
+5. 成熟文本能力没有不可接受退化；
+6. audit readout 通过因果忠实性 Gate。
+
+若未通过，停在 V2-A，重做 transition、训练监督、任务或基座；不进入 V2-B。
+
+## 4. V2-B：多模态与双层 MoE
+
+V2-B 只有在 V2-A 通过后启动。
+
+### 4.1 V2-B0：不可单解的文本 + 视觉任务
+
+- 任务必须同时依赖文本约束和视觉事实；
+- 同 prompt 风格但图像事实不同的 hard negatives；
+- 冲突文本/图像样本；
+- no-text、no-image、shuffled-image 和 text-only 基线；
+- 视觉先语言化与直接视觉 latent 两条路径。
+
+### 4.2 V2-B1：Boundary-MoE + Dense core
+
+- 文本/视觉按显式 modality routing；
+- 专家内部异构，边界统一 `D_latent`；
+- 先 raw concat 保真，再比较 Attention Pump；
+- 潜变量核心使用 V2-A 胜出配置和 Dense FFN；
+- 输出先固定文本专家。
+
+Gate：Boundary-MoE 相对普通统一接口/早期拼接形成因果正确的质量或成本收益；no/shuffled modality 明显下降。
+
+### 4.3 V2-B2：Attention Pump 与 bypass
+
+比较：
+
+1. raw expert tokens；
+2. pump-only；
+3. pump+residual/bypass。
+
+`K_pump` 固定并单独报告，route weight 不直接决定输出长度。Gate 同时看重建、任务、消融和成本。
+
+### 4.4 V2-B3：FFN-MoE 2×2 对照
+
+| 外部接口 | 核心 FFN |
+| --- | --- |
+| 普通接口 | Dense |
+| Boundary-MoE | Dense |
+| 普通接口 | FFN-MoE |
+| Boundary-MoE | FFN-MoE |
+
+FFN-MoE 从 4 experts、top-1 和约 1.25 capacity factor 起步。Boundary router 与 FFN router 分别记录使用率、entropy、collapse 和任务族分布。
+
+Gate：组合相对各单项产生多 seed 可重复净收益；若只增加总参数而没有 active-compute 或质量收益，回退 Dense。
+
+### 4.5 V2-B4：文本 + 视觉 + 动作
+
+- 加入动作状态、动作候选和动作输出专家；
+- 使用 READ/REASON/AUDIT/EMIT/STOP；
+- 输出先显式选择单专家；
+- 检查动作合法性、视觉事实、文本约束和审计一致性；
+- 任一单模态不能独立解决任务。
+
+### 4.6 V2-B5：教师调用到自主调用
+
+1. 静态输入；
+2. 教师指定 READ/EMIT；
+3. 删除调用标签后自主调用；
+4. 加入无效调用、空结果、冲突、超时和精读成本。
+
+Gate：同质量下降低总读取成本，且能从错误调用恢复。该阶段通过后，路线进入总路线图 R3/A1。
+
+## 5. 当前不执行的内容
+
+以下内容已经进入 V2 和总路线，但不属于最近实现：
+
+- 多输出专家候选 arbiter；
+- 图像/视频/音频高保真生成与编辑；
+- 工作树、记忆树和 provider KV 联动；
+- 长程 Agent、多 Agent 与跨窗口恢复；
+- 离线新增专家与授权晋升；
+- 渐进生成和动态资源预算；
+- 商用 serving、数据治理、SLO、计费和客户试点。
+
+## 6. 旧路线收口
+
+以下路线不再继续：
+
+- AV-J-D；
+- 继续优化 AV-J-C 粗粒度 record reward；
+- 把 object/cell/count/relation slot 当作目标架构必须采用的内部本体；
+- 单阶段 from-scratch Micro-Omni 作为 V2 正式验证；
+- Attention Pump 唯一通道；
+- 内部宪法自评后直接固化生产权重；
+- 工作树 drop 等同 KV 无损回收。
+
+旧脚本、测试、报告和 artifact 只保留历史证据地位。后续若实施 V2，应删除或重写锁定旧契约的代码和测试，不建立兼容 wrapper。
+
+## 7. 最近执行顺序
+
+1. 完成 V2-A0 基座与任务选择；
+2. 写 V2-A 文档化实验规格和数据 schema；
+3. 实现 V2-A1 latent reasoner smoke；
+4. 完成 A2 `K/T` sweep；
+5. 完成 A3 audit readout；
+6. 预注册并运行 A4 formal；
+7. 只有 A4 通过后，开始 V2-B0 文本 + 视觉任务设计。
+
+当前没有可运行的 V2-A 命令、脚本或 formal artifact。后续实现时必须同步本文件和 `docs/DIRECTORY_REFERENCE.md`，不得把计划项写成已完成项。
+
+## 8. 担忧与不确定性
+
+1. 成熟文本基座可能无法在本机 8GB 显存上按理想配置训练；应优先冻结、缓存 hidden states、使用小型 latent reasoner，而不是退回 from-scratch 代理模型冒充目标架构。
+2. 复制顶部 block 形成 recurrent reasoner 是参考实现，不保证最优；R1 失败时应与共享层或独立 reasoner 对照。
+3. audit decoder 可能事后合理化；没有因果干预不得判可审计。
+4. 计算匹配比参数匹配更重要；latent 方案不能靠更多 step 和更宽状态获得不公平优势。
+5. Boundary-MoE 与 FFN-MoE 同时训练可能使归因和优化不稳定，因此必须先 Boundary/Dense，再做 2×2。
+6. 商用路线需要首个明确垂直场景；当前文档只覆盖架构和研究路径，不承诺市场已经验证。
