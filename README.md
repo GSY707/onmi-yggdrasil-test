@@ -1,88 +1,26 @@
-# 多模态潜空间智能体可行性验证
+# Project-Yggdrasil V2 研究工作区
 
-这是一个用于验证 `Project-Yggdrasil 未来多模态潜空间智能体架构` 的实验仓库。它还不是成品模型，也不是可以直接拿来和成熟多模态项目比较的系统；这里主要记录一些小模型、本机实验和合成任务里的可行性证据。
+本仓库当前只保留 Project-Yggdrasil V2 的架构真源、路线决策和最近测试计划。现阶段处于 V2-A 实现前的零点：没有可运行的 V2-A/V2-B 训练脚本，也没有可以代表 V2 的 formal 结果。
 
-如果这个项目成功，那么会有两个优点：
-- 1，更高效的推理，在传统的语言思维链中，模型仍然需要把一部分注意力用于组织语言，而不是全部用于思考，大家可以发现，一些高级模型泄漏的推理token中，有很多不可读的语句，这应该是专注推理的表现。
-- 2，原生的无限模态，这个架构在训练初期建立一个潜空间，之后再把各个模态接入潜空间，这不但意味着模型的各个模态可以在同一个向量空间中推理，还使得后期可以添加更多输入、输出路径。比如可以接入动作机械、激光雷达，你可以让学会交通规则的模型去开车，而不是在图像大量训练中识别交通信号灯（比如VA）。具身智能也可以走这条路，并完全基于已有的模型。
+当前主线已经从旧 Stage A—AV-J-C 直接切换为：
 
-旧版 README 的长命令清单已归档到 `docs/archive/README-2026-07-04-legacy-command-list.md`。
+1. V2-A：先在成熟文本基座上比较显式文本 CoT、单向量 latent recurrence 和多向量 latent recurrence。
+2. V2-B：只有 V2-A 通过后，才验证文本/视觉/动作融合、Boundary-MoE 与 FFN-MoE。
 
-## 最近的图像生成和编辑成果
+旧实验不是当前实现路线。原有阶段报告、代理脚本、测试、源码、artifact、旧 README 和思考稿已完整归档到 [`archive/legacy-proxy-route-2026-07-11/`](archive/legacy-proxy-route-2026-07-11/)，保留作历史证据，不建立兼容入口。
 
-最近的实验重点是：模型能不能把图像或文字转成 latent，再由输出专家重新画出图像。
+## 当前入口
 
-Stage AI 做的是低熵单物体合成图像任务。输入是文字 prompt 或源图 + 编辑指令，输出是 64x64 的目标图。结果显示：
+- [V2 架构白皮书](docs/Project-Yggdrasil%20%E5%A4%9A%E6%A8%A1%E6%80%81%E6%BD%9C%E5%8F%98%E9%87%8F%E6%8E%A8%E7%90%86%E6%9E%B6%E6%9E%84%E7%99%BD%E7%9A%AE%E4%B9%A6%20V2.md)：唯一目标架构规范。
+- [V2 总路线图](docs/Project-Yggdrasil%20V2%20%E4%BB%8E%E6%9E%B6%E6%9E%84%E9%AA%8C%E8%AF%81%E5%88%B0%E5%95%86%E7%94%A8%E8%B7%AF%E7%BA%BF%E5%9B%BE.md)：从 R0 到架构完整版和商用版的唯一高层路线。
+- [下一阶段测试计划](docs/next-stage-test-plan.md)：当前执行真源，定义 V2-A/V2-B 的顺序、证据等级、Gate 和旧路线收口。
+- [架构审阅记录](docs/project-yggdrasil-latent-reasoning-architecture-review-2026-07-11.md)：V2 决策形成依据，不与白皮书并行定义规范。
+- [目录索引](docs/DIRECTORY_REFERENCE.md)：当前保留项和归档边界。
 
-- 文字直接生成、文字到 latent 再生成、源图编辑三个主任务都达到 100% scene exact。
-- 去掉源图后，编辑成功率只剩 3.42%；只复制源图不按指令编辑是 0%。这说明模型确实用了源图和编辑指令。
-- 这个结果只说明低熵合成任务能跑通，不说明真实照片生成能力。
+## 当前未完成项
 
-Stage AJ 把任务改得更接近未来图像编辑：整张源图先切成 patch tokens，再压到 latent，最后由 Transformer patch decoder 完整重绘目标图。这里的目标不是局部贴补，而是重新画完整图。
+V2-A0 的基座、任务、数据 schema 和基线尚未实现；因此当前不能运行 V2 训练、不能声称架构通过，也不能把归档中的代理结果升级为 V2 证据。
 
-目前最好的正向结果来自对象属性和 mask 辅助监督：
+## 文件治理原则
 
-- `memory_tree_supervised_copy` 在正式 copy-only 任务上达到 100% scene exact，foreground MSE 为 0.000794，辅助对象表和 mask IoU 也是 100%。
-- `memory_tree_supervised_edit` 在正式单 seed 长训中达到 99.02% scene exact；去掉源图后只有 4.10%，说明源图信息确实进入了 latent。
-- `text_supervised_generate` 在正式单 seed 规范背景生成任务上达到 100% scene exact。
-
-这部分的含义比较朴素：输出专家不是完全画不回来，关键是 latent 里要有清楚的对象约束。没有对象属性和 mask 监督时，模型容易只学背景，丢掉前景物体。
-
-## 之前多模态融合读取的成功结果
-
-比较早的一次成功实验是 Stage E+F 多模态融合与潜空间数据流动。
-
-这个任务把三类信息一起放进模型：
-
-- 图像输入。
-- 文本目标。
-- 遥测/状态信息。
-
-模型把这些信息汇入 shared latent bus，再输出完整文本答案。3 个 seed 的结果中，shared latent fusion 的 action 和 text 输出都达到 100%。清零任一路 latent 后分数明显下降，slot probe 也能读出各模态自己的信息。
-
-这个实验说明，在一个受控小任务里，图像、文本、结构化状态可以合到同一个潜空间里，并且后续模块能从这个潜空间读出答案。后面更难任务里的失败这里不展开，README 只保留这次正向证据。
-
-## 我们想做什么
-
-这个项目想验证一条比较长期的路线：
-
-1. 把不同模态转换到统一的潜变量空间。文字、图像、结构化状态、工具结果、记忆节点，最终都应该能进入同一种内部表示。
-2. 输入不应该只是“把所有东西塞进上下文”。更理想的方式是：输入专家先把材料整理成可读取的结构，模型按需主动读取。
-3. 记忆树负责保存摘要、层级、引用和关联边，不保存大块原始材料。高熵内容留在外部文件、图像、视频或工具里，需要时再读。
-4. 工作树负责长任务和上下文管理。模型可以在工作节点之间展开、折叠、回看和继续，而不是依赖一个无限长上下文窗口。
-5. 输出专家要能从 latent 反向还原材料。文字输出、图像生成、图像编辑都应该是 latent 到输出材料的过程。
-6. 训练路线应该循序渐进：先利用文本能力建立 latent 与文本之间的互译，再逐步加入图像、结构化状态、工具和记忆，避免一开始就把所有模态混在一起硬训。
-
-更简单地说，我们想做的是：让模型有一个可读、可写、可回忆、可操作的内部潜空间；外部材料由专家负责读写，长期上下文由记忆树和工作树负责组织。
-
-## 已经得到的初步证明
-
-目前比较可靠的初步证明有这些：
-
-- 核心接口可以写成稳定代码：LOD pooling、LOD embedding、attention pump、memory tree、KV cache tree、progressive generation 都有单元测试覆盖。
-- 记忆树口径是可实现的：节点保存摘要、URI 引用和关系边，原始高熵 payload 会被拒绝。
-- 变长专家输出可以被聚合进统一 token 序列：`CrossAttentionPump` 能按路由权重处理不同长度的专家输出。
-- Stage E+F 证明了一个小型多模态任务中，图像、文本、遥测可以汇入 shared latent bus，并从中读出正确答案。
-- Stage AK 证明了先训练统一 object/pair latent bus 后，relation 任务里的对象检索和位置比较可以同时闭合：pair row/col、left/right retrieval、relation compare 都达到约 99%-100%。
-- Stage AL 进一步证明硬化后的统一潜空间可以接入答案输出头：model-selected answer 达到 99.61%，no-evidence answer 约 60.35%。
-- Stage AM 把难度拉回 color/shape/count/relation 四任务后，证明 cell/count slots 必须成为一等 latent bus：加入 count 输入专家和 decoded position compare 后，四任务 model answer 达到 98.24%，count/color/shape 均 100%，relation 为 92.97%，no-evidence answer 为 27.54%。
-- Stage AN/AQ 进一步证明统一 bus 可以接 answer-token writer，并且 relation 需要显式 delta/truth-table 过程状态：Stage AN answer-token sequence exact 为 98.11%，Stage AQ 把 relation sequence exact 提到 99.74%，no-evidence relation truth-table 约 50.52%。
-- Stage AI 证明了低熵图像生成/编辑链路能闭合。
-- Stage AJ/AP 证明了 Transformer patch decoder 加对象/mask 辅助监督后，可以从 latent 完整重绘合成对象图，并在正式单 seed 长训中完成源图编辑和规范背景文本生成。
-
-还没有证明的东西也要说清楚：这里没有证明真实照片级生成质量，没有证明真实 VLM 能力，没有证明完整潜空间推理，也没有证明 provider 级 KV Cache 物理剪枝。当前仓库的价值主要是把路线拆成一个个能跑、能消融、能归档的小证据。
-
-## 运行和证据入口
-
-轻量测试：
-
-```powershell
-python -m pytest -q
-```
-
-主要文档：
-
-- `docs/feasibility-report.md`：完整阶段性结论。
-- `docs/DIRECTORY_REFERENCE.md`：目录索引。
-- `docs/Project-Yggdrasil 未来多模态潜空间智能体架构.md`：原始白皮书。
-- `docs/archive/README-2026-07-04-legacy-command-list.md`：旧 README 命令归档。
+归档代表降级为历史证据，不代表删除。后续实现 V2 时应直接创建新的 V2-A 代码和测试，删除或重写旧契约，不在旧代理代码上添加兼容 wrapper。
