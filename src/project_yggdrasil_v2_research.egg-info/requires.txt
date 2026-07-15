@@ -1,0 +1,7 @@
+huggingface-hub<2,>=1.5
+safetensors>=0.4
+torch>=2.6
+transformers<6,>=5.13.1
+
+[test]
+pytest>=8

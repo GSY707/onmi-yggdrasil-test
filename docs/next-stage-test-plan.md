@@ -1,12 +1,12 @@
 # 下一阶段测试任务规划
 
-日期：2026-07-11
+日期：2026-07-13
 
 架构真源：`docs/Project-Yggdrasil 多模态潜变量推理架构白皮书 V2.md`
 
 总路线：`docs/Project-Yggdrasil V2 从架构验证到商用路线图.md`
 
-当前状态：V2-A 尚未实现；本文件只冻结最近两部分实验，不提供不存在的训练命令或结果。
+当前状态：V2-A0 数据/基座链路、2B text-CoT probe 和当前结构的 V2-A1 mechanism smoke 已实现；旧 A2 probe 未形成稳定 Pareto。A1.5 独立实验已完成数据合同、P0 结构化正控制、P1 Qwen hidden cache 的 4096-cache formal surrogate、P2 K=8 formal learned workspace 和 0.8B no-cap text baseline runner：P0 32-example overfit final/state full exact `1.0/1.0`，4096-example best ordinary test `1.0/1.0`，composition-heldout `0.2734/0`，length-heldout final/state full exact `1.0/0.2266`；P1 ordinary validation final/state `1.0/1.0`（small probe `0.2188/0.4491` 仅为 underfit 诊断）；P2 ordinary test `1.0/1.0`、composition `0.2773/0`、length `1.0/0.6484`；0.8B test zero-shot 128 条 no-cap formal parse/final/state `0.1797/0.0625/0.0234`，10 条 safety timeout。A1.5 仍未通过；composition/length 与 2-shot matched text 全矩阵、多 seed/cost/architecture-fidelity 尚未完成，A3/A4/V2-B 保持停止。
 
 ## 1. 路线直接切换
 
@@ -52,6 +52,8 @@
 
 选择一个能稳定完成任务的最小成熟文本基座，并建立公平的文本推理基线。
 
+当前默认候选为 Qwen3.5-2B（revision `15852e8c16360a2fea060d615a32b45270f8a8fc`，Apache-2.0）；按用户要求，Qwen3.5-0.8B（revision `2fc06364715b967f1860aea9cf38778875588b17`）已在同一 schema、prompt 和 latent 配置下重跑。0.8B 当前 32-example text-CoT smoke exact `0.75`、同构 latent test `0.2578`，质量明显弱于 2B text-CoT，暂不替换默认基座。V2-A 只从官方 checkpoint 提取 language model 权重，不激活视觉塔。任务 schema 为 `yggdrasil.v2-a.symbolic-state-machine.v4`：三寄存器 `amber/cobalt/jade`、`A-J` 单 token 符号、canonical `SWAP/COPY` 操作、`swap->copy` composition heldout 和 5–6 步 length heldout。
+
 #### 必须完成
 
 - 确定基座、tokenizer、推理模式和许可证；
@@ -94,6 +96,8 @@
 #### Gate A1
 
 前后向、checkpoint/resume、无答案旁路、固定 `K/T` 的任务学习和结果 schema 均通过；该 Gate 只证明机制可训练，不提供介质优越性结论。
+
+0.8B 的 `artifacts/v2-a/a1/smoke-k8-t8-qwen3p5/results.json` 只证明早期机制可跑；当前 2B 证据必须以 `artifacts/v2-a/a1/smoke-k8-t8-qwen3p5-2b-current/results.json` 为准。该结果已完成前后向、实际 checkpoint/resume、no-bypass 和干预链 smoke，使用 full-attention layer `[19,23]`，质量仍只能按 smoke 解释。
 
 ### 3.3 V2-A2：`K/T` 容量—步骤曲线
 
@@ -159,6 +163,21 @@
 6. audit readout 通过因果忠实性 Gate。
 
 若未通过，停在 V2-A，重做 transition、训练监督、任务或基座；不进入 V2-B。
+
+### 3.6 V2-A1.5：潜空间建立与递归正控制（当前执行结果）
+
+A1.5 是在旧 A2 之后新增的分层正控制，不继续旧 K/T sweep。它使用独立 schema `yggdrasil.v2-a1.5.symbolic-state-machine.v1`，要求 train 覆盖 1–4 步，普通 test 与 composition-heldout 同为 2–4 步，length-heldout 为 5–6 步；每一步通过 no-op 反事实检查必要性，并保存 operation span/mask。
+
+当前结果：
+
+- P0 结构化 explicit-register recurrent core 已通过 32-example overfit；4096-example/192k sampled training 的 best ordinary test final/state full exact 为 `1.0/1.0`，说明 shared transition、state CE 和训练链可运行；
+- P0 composition-heldout final/state 为 `0.2734/0`，length-heldout final/state full exact 为 `1.0/0.2266`，所以逐步状态与未见组合仍未通过；
+- P1 已真实生成 Qwen3.5-2B FP16、分片、无静默截断的 hidden cache；small probe 仅为 underfit 诊断，4096-cache warm-up/joint formal ordinary validation final/state `1.0/1.0`，并支持 best checkpoint reload 与五 split `p1-evaluate`；
+- A1.5 matched text-CoT 入口已支持 Qwen3.5-0.8B/2B、zero-shot/2-shot 和无人工总输出 cap；0.8B test/composition/length zero-shot 各128条 formal 分别为 parse/final/state `0.1797/0.0625/0.0234`、`0.4063/0.3828/0.3750`、`0.0625/0/0`，2-shot test/composition/length final/state `0.1328/0.0156`、`0.1953/0`、`0.0938/0`，test zero-shot 有10条 safety timeout。批量 runner 增加透明 per-example wall-time safety timeout，但512条扩展矩阵仍未完成；
+- P2 learned K=8 slots 已完成 formal 训练与干预：ordinary 通过，composition 与 same-answer shuffle 失败，length state full 仅 `0.6484`；
+- A1.5 未通过，A3 audit、A4 formal 和 V2-B 均保持停止。
+
+详细记录、命令和 artifacts：`docs/v2-a1.5-latent-foundation.md`、`tmp/V2-A1.5 result.md`、`artifacts/v2-a/a1_5/`。下一轮优先修正 operation-composition binding、same-answer identity dependence 与 length state fidelity；P1 ordinary interface 已建立，不返回旧 A2 的 K/T sweep。
 
 ## 4. V2-B：多模态与双层 MoE
 
@@ -250,15 +269,13 @@ Gate：同质量下降低总读取成本，且能从错误调用恢复。该阶�
 
 ## 7. 最近执行顺序
 
-1. 完成 V2-A0 基座与任务选择；
-2. 写 V2-A 文档化实验规格和数据 schema；
-3. 实现 V2-A1 latent reasoner smoke；
-4. 完成 A2 `K/T` sweep；
-5. 完成 A3 audit readout；
-6. 预注册并运行 A4 formal；
-7. 只有 A4 通过后，开始 V2-B0 文本 + 视觉任务设计。
+1. 已完成 V2-A0 基座候选筛选、canonical 任务选择、数据 schema 和可复现数据生成；
+2. Qwen3.5-2B 普通/组合 heldout text-CoT probe 已形成正向信号，length-heldout 仍有错误；
+3. 已完成当前结构的 2B V2-A1 `K=8/T=8` latent mechanism smoke、checkpoint/resume、no-bypass 和干预链；
+4. 已完成 A2 K/T（含 K16/T8 与 K8/T2/T4/T16）、prompt contract、source-mean 初始化、copied/MLP transition、latent-attention probe、mean/flatten readout、source reread、token-wise source adapter、full-data、masked state/query-state supervision、step-level verifier RL 以及 0.8B/2B 基座对照；source-layer bank、token mixer 和 latent-attention 的失败入口已删除；2B K8/T8 full-data MLP test `0.6016`，composition-heldout `0.3672`，source adapter bottleneck=128 为 `0.5859/0.4063/0.5078`（test/composition/length），masked state supervision 为 `0.5703/0.3984/0.4219`，latent-attention 为 `0.5078/0.4141/0.4531` 且 no/shuffled latent 均 `0.0938`，verifier-RL 为 `0.5625/0.3906/0.5547` 且状态 verifier 未学会，0.8B 同构 latent test `0.2578`，均未形成相对 text-CoT 的稳定 Pareto，Gate A2 未通过；
+5. 在新的 encoder/latent 信息保真设计形成稳定正向证据前，不执行 A3 audit、A4 formal 或 V2-B0。
 
-当前没有可运行的 V2-A 命令、脚本或 formal artifact。后续实现时必须同步本文件和 `docs/DIRECTORY_REFERENCE.md`，不得把计划项写成已完成项。
+当前已有可运行的 V2-A 命令和 smoke artifact，但没有 formal artifact。阶段记录、脚本入口和结果边界见 `docs/v2-a-reasoning-medium-experiment.md`；不得把 smoke 写成 Gate 通过。
 
 ## 8. 担忧与不确定性
 
@@ -268,3 +285,12 @@ Gate：同质量下降低总读取成本，且能从错误调用恢复。该阶�
 4. 计算匹配比参数匹配更重要；latent 方案不能靠更多 step 和更宽状态获得不公平优势。
 5. Boundary-MoE 与 FFN-MoE 同时训练可能使归因和优化不稳定，因此必须先 Boundary/Dense，再做 2×2。
 6. 商用路线需要首个明确垂直场景；当前文档只覆盖架构和研究路径，不承诺市场已经验证。
+7. Qwen3.5-0.8B 在当前 Windows 环境缺少 `flash-linear-attention`/`causal-conv1d` fast path；文本塔可以运行但 baseline latency 较高，不能把该环境差异包装成 latent 成本优势。当前 32-example text-CoT smoke 的 `artificial_output_token_cap` 为 `null`，未设置人为总输出长度上限。
+8. 当前 2B text-CoT 在普通 test 与 composition-heldout probe 为正向强基线；修正后的 2B K8/T8 full-data MLP latent 为 `0.6016/0.3672/0.5078`（test/composition/length），K8/T4 为 `0.5234/0.3672/0.4063`，K16/T8 为 `0.5078/0.4063/0.3906`，source adapter bottleneck=128 为 `0.5859/0.4063/0.5078`，K8/T2/T16 也未形成 Pareto；0.8B 同构 latent test 为 `0.2578`。仍没有多 seed 稳定性和 Pareto 优势，不能把训练 loss、teacher/state 辅助 loss、adapter 的单项 heldout 增益或单次准确率包装成 A2 通过。
+9. 将 text-CoT 的 2 个 trace demonstrations 注入 encoder 的 probe 反而降至 test 0.0625，说明 demonstrations 不是当前 latent 的稳健修复，后续不能把它当作默认输入合同。
+10. Qwen3.5 原生 thinking 的单样本探针在 206 token 后未形成可解析终态；native thinking 不能被当作 A0 visible CoT 的替代 Gate。
+11. token-wise source adapter 在 bottleneck=128 的两个 seed 中把 composition-heldout 提升到 `0.4063/0.4609`，但普通 test 为 `0.5859/0.5078`、length 为 `0.5078/0.4766`，没有同时超过 K8/T8 baseline `0.6016/0.3672/0.5078`。bottleneck=512 的普通 test 为 `0.5469`。该方向只能作为下一轮信息保真/正则化设计的候选，不能直接进入 A3。
+12. 将前三个 latent slot 绑定到 amber/cobalt/jade 的 register-slot supervision full512 probe 为 `0.5859/0.3750/0.5078`，没有把 adapter 的 composition 增益转化为答案泛化；过程监督仍不能替代正式 verifier/reward 设计。
+13. 首次 step-level verifier self-critical RL full512 probe 使用 v5 有效步骤 mask，结果为 `0.5625/0.3906/0.5547`，test greedy register accuracy `0.0968`、state/final exact 均为 `0`，末尾 policy entropy 约 `0.0017`。RL 已进入反传但发生策略塌缩，不能把 reward loss 或 sampled/greedy reward 当成状态学习证据；后续若重做，必须先解决 reward 信号稀疏和 policy collapse。
+14. 为符合白皮书的 Attention + Dense FFN 参考结构，曾加入 identity-initialized latent-attention transition；full512 的 test/composition/length 为 `0.5078/0.4141/0.4531`，no-latent 与 shuffled-latent 都为 `0.0938`。它没有形成因果递归或 Pareto 优势，当前代码与 CLI 已删除，不保留并列旧入口。
+15. state/query-state supervision 已改为只计真实程序步骤，masked state full512 为 `0.5703/0.3984/0.4219`，但 test/length 仍低于无监督 MLP baseline，且 shuffled-latent 高于 no-latent；mask 修复解决了计量错误，不等于过程监督形成了有效 verifier。

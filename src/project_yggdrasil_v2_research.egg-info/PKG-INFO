@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: project-yggdrasil-v2-research
+Version: 0.1.0
+Summary: Project-Yggdrasil V2 architecture-fidelity experiments
+Requires-Python: >=3.11
+Requires-Dist: huggingface-hub<2,>=1.5
+Requires-Dist: safetensors>=0.4
+Requires-Dist: torch>=2.6
+Requires-Dist: transformers<6,>=5.13.1
+Provides-Extra: test
+Requires-Dist: pytest>=8; extra == "test"

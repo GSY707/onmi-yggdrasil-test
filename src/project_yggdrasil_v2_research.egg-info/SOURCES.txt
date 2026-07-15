@@ -1,0 +1,17 @@
+README.md
+pyproject.toml
+src/project_yggdrasil_v2_research.egg-info/PKG-INFO
+src/project_yggdrasil_v2_research.egg-info/SOURCES.txt
+src/project_yggdrasil_v2_research.egg-info/dependency_links.txt
+src/project_yggdrasil_v2_research.egg-info/requires.txt
+src/project_yggdrasil_v2_research.egg-info/top_level.txt
+src/yggdrasil_v2/__init__.py
+src/yggdrasil_v2/reasoning_medium/__init__.py
+src/yggdrasil_v2/reasoning_medium/artifacts.py
+src/yggdrasil_v2/reasoning_medium/baseline.py
+src/yggdrasil_v2/reasoning_medium/data.py
+src/yggdrasil_v2/reasoning_medium/model.py
+src/yggdrasil_v2/reasoning_medium/prompts.py
+src/yggdrasil_v2/reasoning_medium/train.py
+tests/test_v2_a_data.py
+tests/test_v2_a_model.py
