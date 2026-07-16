@@ -1,12 +1,12 @@
 # 下一阶段测试任务规划
 
-日期：2026-07-13
+日期：2026-07-16
 
 架构真源：`docs/Project-Yggdrasil 多模态潜变量推理架构白皮书 V2.md`
 
 总路线：`docs/Project-Yggdrasil V2 从架构验证到商用路线图.md`
 
-当前状态：V2-A0 数据/基座链路、2B text-CoT probe 和当前结构的 V2-A1 mechanism smoke 已实现；旧 A2 probe 未形成稳定 Pareto。A1.5 独立实验已完成数据合同、P0 结构化正控制、P1 Qwen hidden cache 的 4096-cache formal surrogate、P2 K=8 formal learned workspace 和 0.8B no-cap text baseline runner：P0 32-example overfit final/state full exact `1.0/1.0`，4096-example best ordinary test `1.0/1.0`，composition-heldout `0.2734/0`，length-heldout final/state full exact `1.0/0.2266`；P1 ordinary validation final/state `1.0/1.0`（small probe `0.2188/0.4491` 仅为 underfit 诊断）；P2 ordinary test `1.0/1.0`、composition `0.2773/0`、length `1.0/0.6484`；0.8B test zero-shot 128 条 no-cap formal parse/final/state `0.1797/0.0625/0.0234`，10 条 safety timeout。A1.5 仍未通过；composition/length 与 2-shot matched text 全矩阵、多 seed/cost/architecture-fidelity 尚未完成，A3/A4/V2-B 保持停止。
+当前状态：V2-A0 数据/基座链路、2B text-CoT probe 和当前结构的 V2-A1 mechanism smoke 已实现；旧 A2 probe 未形成稳定 Pareto。A1.8 使结构化 core 通过 T24，A1.9 证明 oracle-role-segmented Qwen hidden 可驱动该 frozen core。A1.10 full-token Qwen hidden + 匿名 `K=8` workspace + 通用 recurrent Transformer formal `0/3`。A1.11 已完成正交定位：learned full-text Boundary 在严格 pointer overfit Gate 失败，hard re-embedding 诊断全通过；exact-symbolic typed roles → anonymous generic reasoner overfit32 通过但 formal 稳定 `0/3`，且训练子集 trajectory 仍接近 `0`。因此 A1.10 不是纯组合故障，主要独立失败源位于匿名 binding／generic transition／当前 readout objective 这一整臂；二者内部尚未分开。matched text-CoT、A3/A4/V2-B 未启动。
 
 ## 1. 路线直接切换
 
@@ -179,6 +179,88 @@ A1.5 是在旧 A2 之后新增的分层正控制，不继续旧 K/T sweep。它�
 
 详细记录、命令和 artifacts：`docs/v2-a1.5-latent-foundation.md`、`tmp/V2-A1.5 result.md`、`artifacts/v2-a/a1_5/`。下一轮优先修正 operation-composition binding、same-answer identity dependence 与 length state fidelity；P1 ordinary interface 已建立，不返回旧 A2 的 K/T sweep。
 
+### 3.7 V2-A1.6/A1.7：连续递归核心闭包（当前执行结果）
+
+A1.6 建立了三寄存器 relation-addressed continuous core，但正式 C0 的 relation-heldout trajectory full 仅 `0.765625`。后续只读诊断表明 oracle-reset one-step 与 predicted hard re-embed diagnostic 在 test/length/relation/causal 四个 split 均为 `1.0`，把失败定位到连续 latent 写回的递归闭包；旧 final-vs-trajectory Gate 无效，旧 relation split 也不是严格单变量 holdout。
+
+A1.7 直接切换到独立 schema 和实现，不兼容修补 A1.6：state slot 只含 value content，register key 只负责寻址；唯一新增训练约束是权重 `1.0`、target stop-gradient 的 canonical value prototype cosine closure。唯一 relation holdout 为 `COPY amber→jade`，train/validation/test/length 覆盖其他 11 个 family×directed-pair 组合，relation 每例恰好一次 holdout，background 全在训练支持内。
+
+当前结果：
+
+- data audit 十项 Gate 全部通过，relation heldout 位置 1–4 各 `128`，cross-split fingerprint overlap `0`，causal deletion necessary rate `1.0`；
+- overfit32 在 step `200` 达到五项 fit-only 指标全 `1.0`；
+- seed `20260715/20260716/20260717` 的 fresh formal C0 与 causal intervention 均通过；目标 seed 的 test/length/relation trajectory full 为 `1.0/0.996094/0.998047`，causal prefix/replacement/deletion/shuffled 为 `0.999349/0.997394/1.0/1.0`；
+- 同 seed、同数据、同容量的 2×2 消融中，content-only/address-mixed 与 closure on/off 四种组合均通过 5–6 步 formal 和 causal Gate。因此短程通过不能证明地址/内容分离或 closure 必要，修正后的训练组合覆盖和 relation sequence 是重要贡献；
+- fingerprint 零重叠的 8/12/16 步压力评测要求两个 split 的 aggregate 和每个长度 trajectory full 均不低于 `0.95`，三个目标 seed 为 `0/3` 通过。T16 supported 为 `0.894531/0.941406/0.894531`，说明任意加深递归尚未成立；
+- closure-off 的 T16 supported 在 content-only/address-mixed 下分别降到 `0.449219/0.679688`，而 closure-on 为 `0.894531/0.953125`。closure 对长程漂移有实质作用；地址/内容分离尚无独立正收益；
+- 当前对 V2-A 形成 matched text-CoT 质量—成本 Pareto 的工程判断为 `40%–55%`、中心约 `48%`，完整白皮书 V2 为 `20%–35%`。这些是分层工程概率，不是统计置信区间；
+- A1.7 只证明结构化 relation-addressed core 的短程可复现性，不证明 Qwen hidden、匿名 workspace 或完整 V2-A；本轮按合同不进入 C1。
+
+详细记录与 artifacts：`docs/v2-a1.7-core.md`、`tmp/V2-A1.7 result.md`、`artifacts/v2-a/a1_7/core-assessment-summary.json`。A1.7 的长程失败已由 A1.8 后续实验继续归因；不能单独使用本节把结构化正控制升级为完整架构结论。
+
+### 3.8 V2-A1.8：随机深度长程递归（已完成）
+
+A1.8 没有更改 A1.7 的 content-only slots、address keys、shared transition、shared state/answer head 或 closure。唯一主动变量是把训练长度从 T1–4 切换为 T1–16，并在每个 batch 内对 16 个长度严格均衡采样。best checkpoint 以 validation 最差长度优先选择。
+
+三组独立 data/model seed 为 `20260721/20260821`、`20260722/20260822`、`20260723/20260823`。每组数据各 `22,784` 条，彼此以及与 A1.7 data/stress fingerprint overlap 均为 `0`。length-balanced overfit32 通过。
+
+正式结果：
+
+- 三个 run 的 short T1–6 最低 trajectory 均为 `1.0`；
+- T16 supported 最低 `0.996094`、relation 最低 `1.0`；
+- OOD T24 supported 最低 `1.0`、relation 最低 `0.996094`；
+- 诊断性 T32 supported 最低 `0.988281`、relation 最低 `1.0`；
+- 三个 run 的 causal prefix/replacement/deletion/shuffled 全部为 `1.0`；
+- initial-slot 扰动平均放大率在 T16/T24/T32 均低于 `1.0`，prototype margin 保持为正；
+- 三 run 共处理 `204,800` examples、`1,740,800` latent transitions，实测训练 `610.5` 秒；成本 benchmark 与机器可读总表均已保存。
+
+**A1.8 总 Gate 为 3/3 passed。**A1.7 T16 supported/relation mean 从 `0.910156/0.928385` 提升到 A1.8 的 `0.998698/1.0`。由于架构与 closure 不变，结果否定了 shared transition 在 T16 必然内在发散，并强烈支持训练 horizon mismatch；但 A1.8 regimen 同时改变了 horizon coverage 和 transition exposure，没有 compute-matched 地拆开两者贡献。
+
+这个结果仍只属于强结构化 COPY/SWAP core；后续 A1.9 已在不修改 core 的前提下继续验证真实 Qwen hidden boundary，并以 3/3 通过。A1.8 的概率与下一步判断仅保留为阶段快照。
+
+详细记录与 artifacts：`docs/v2-a1.8-long-horizon.md`、`tmp/V2-A1.8 result.md`、`artifacts/v2-a/a1_8/assessment-summary.json`。
+
+### 3.9 V2-A1.9：冻结 Qwen hidden 边界（已完成）
+
+A1.9 冻结 Qwen3.5-2B 和三个已经通过的 A1.8 core，只训练 value、family 和共享 register 边界映射。source、target、query 共用 register adapter；query 只能选择最终 slot；不允许 full-source、answer、query bypass、新答案头、core/Qwen 解冻或旧 A1.6 compatibility wrapper。训练继续使用 T1–16 batch 内均衡长度，正式 Gate 保持 short、T8/T12/T16、T20/T24、relation、trajectory、pointer 与 answer/state identity，并新增 core hash 不变和 boundary mapping Gate。
+
+Qwen cache 只保存 oracle role spans 的 pooled contextual hidden，不保存 full-source hidden。由于 span hidden 仍可能携带全局上下文，A1.9 必须在普通 Gate 通过后执行 replacement/deletion/step shuffle、query swap、same-answer/different-trajectory、no-hidden 和 independent role shuffle；干预必须同时检查对重新计算 oracle 的跟随和对旧 oracle 的放弃，不能只报告 final answer changed rate。
+
+A1.9 的 overfit32 在 step `100` 达到 mapping、pointer、trajectory 与 answer 全 `1.0`。三个正式 run 的 cache audit、formal 和 hidden intervention 均通过；三组 cache 各 `22,784` 条记录且 fingerprint 两两 overlap 为 `0`。short T1–6 最低 trajectory `1.0`，T16 supported/relation 最低 `1.0/0.996094`，T24 均为 `1.0/1.0`，诊断性 T32 为 `0.996094/1.0`，boundary mapping 最低 `1.0`。core hash 全部不变。
+
+prefix、replacement、deletion、operation shuffle、query swap 和 same-answer/different-trajectory 对新 oracle 的跟随率在三个 run 中全部为 `1.0`；replacement/same-answer 对旧 trajectory 的保留率为 `0`，no-hidden 和 independent role shuffle 的 trajectory full exact 为 `0`。因此 **A1.9 总 Gate 为 3/3 passed**，可以声称 oracle-role-segmented frozen Qwen hidden 能因果忠实地驱动 frozen structured core。
+
+三组 Qwen role encoding 共 `3,451.30` 秒、cache 占用 `9,177,138,012` bytes；计时不含模型/tokenizer 首次加载。cached boundary/core benchmark 也不包含在线 Qwen 编码，且未与 text-CoT 对照，因此不是 Pareto 证据。完整合同与结果见 `docs/v2-a1.9-qwen-boundary.md`、`tmp/V2-A1.9 result.md` 和 `artifacts/v2-a/a1_9/assessment-summary.json`。
+
+A1.9 仍使用 oracle character spans、typed value/family/register 输入和显式三寄存器 COPY/SWAP core，不覆盖从完整文本自主发现 role、匿名 K-slot workspace、通用 recurrent Transformer reasoner 或 matched text-CoT Pareto。当前对 V2-A 形成 matched text-CoT 质量—成本 Pareto 的工程判断更新为 `48%–63%`、中心约 `55%`，完整白皮书 V2 为 `24%–40%`；这不是统计置信区间，上调只来自真实 Qwen hidden 接入风险下降。
+
+### 3.10 V2-A1.10：完整文本匿名工作区与通用 reasoner（已完成，失败）
+
+A1.10 同时删除 A1.9 的 oracle character spans、typed role adapter、显式三寄存器 slots/keys 和 COPY/SWAP 专用 transition。Qwen3.5-2B 完全冻结，cache 只保存完整 last hidden 与 attention mask；`K=8`、`D=256` 的匿名 learned queries 先读取完整 source，再由两层共享 pre-norm self-attention/cross-attention/Dense FFN 递归更新。模型前向不接收 operation mask、program length、role tensor 或 register identity。T1–16 统一运行 16 步并在程序结束后要求状态保持。
+
+修正版 overfit32 在 best step `800` 达到 T1–16 trajectory/final/answer 全 `1.0`。三个正式 run 各训练 4,000 steps，cache audit 全部通过且跨 run train fingerprint overlap 为 `0`，但 formal 为 `0/3`：T16 supported trajectory 为 `0.003906/0/0`，relation 为 `0/0/0`；T24 supported/relation 全为 `0`。T16/T24 final state 与 answer 仍约 `0.4–0.6`，说明模型学到部分终态或统计信号，却没有形成逐步状态推进。训练集均衡诊断 trajectory 同样接近 `0`，失败不是只出现在 relation/OOD。
+
+三个 ordinary formal 均失败，按预注册没有运行 hidden intervention。三组 full-token cache 共 `38,358,822,720` bytes，Qwen 净编码 `4,767.62` 秒；三组训练 `3,256.60` 秒、`6,144,000` recurrent transitions。A1.10 只能否定当前联合配置，不能分别否定 full-text boundary、匿名 workspace 或通用 reasoner。完整合同与结果见 `docs/v2-a1.10-anonymous-workspace.md`、`tmp/V2-A1.10 result.md` 和 `artifacts/v2-a/a1_10/assessment-summary.json`。
+
+当前对 V2-A 形成 matched text-CoT 质量—成本 Pareto 的工程判断下调为 `30%–45%`、中心约 `37%`，完整白皮书 V2 为 `14%–28%`。这不是统计置信区间。
+
+### 3.11 V2-A1.11：正交故障定位（已完成，定位成立）
+
+本阶段没有继续联合配置的 K/T/层数/步数 sweep，而是完成两个对称诊断：
+
+1. `A1.11-Boundary`：full-token frozen Qwen hidden → learned typed role reader → frozen A1.8 core，只删除 oracle spans。修正版 overfit32 的 trajectory/answer/mapping 全为 `1.0`，但 source/target pointer 最低均为 `0.9642857143`，严格 Gate failed；只读 hard re-embedding 后所有指标为 `1.0`，formal 按停止规则未运行；
+2. `A1.11-Reasoner`：最终使用 exact symbolic typed roles，不加载 Qwen/cache/adapter/core → anonymous `K=8` generic recurrent reasoner。overfit32 在 best step 800 全指标 `1.0`；三组 formal 为 `0/3`，short/in-range/relation/T20–24/causal trajectory 均为 `0–0.003906`，训练集均衡诊断 trajectory 也只有 `0–0.003906`。
+
+Reasoner 在精确输入下独立失败，已经否定“两个健康组件只在组合后失败”。Boundary 另有连续 latent 与 frozen address geometry 的严格接口缺陷，但 task-level formal 因 overfit stop rule 未知。完整合同与结果见 `docs/v2-a1.11-fault-localization.md`、`tmp/V2-A1.11 result.md` 和 `artifacts/v2-a/a1_11/assessment-summary.json`。
+
+当前对 V2-A 形成 matched text-CoT 质量—成本 Pareto 的工程判断调整为 `22%–35%`、中心约 `28%`，完整白皮书 V2 为 `10%–22%`。这不是统计置信区间；下调来自 exact-symbolic 条件仍无法形成大分布逐步算法，保留的上行空间来自 A1.8/A1.9 已证明最小结构化状态与真实 Qwen hidden 分别可工作。
+
+### 3.12 V2-A1.12：Reasoner 内部最小拆分（下一阶段，未预注册）
+
+下一阶段只恢复最小 entity-addressable state workspace，同时保留 exact symbolic roles、通用 learned recurrent block、相同训练长度和相同 readout Gate。该单因子实验回答匿名 slot binding 是否为主要故障；如果通过，再判断 structured transition 是否仍有必要；如果仍失败，故障将更集中到 operation-step alignment、generic transition 或目标函数。
+
+本阶段不得直接恢复完整 A1.8 COPY/SWAP core，不得同时修改 workspace、transition、loss 和 curriculum，也不得把 Boundary hard re-embedding 混入。A1.12 完成前不重启 full-text formal，不做 A1.10 宽度/层数 sweep。
+
 ## 4. V2-B：多模态与双层 MoE
 
 V2-B 只有在 V2-A 通过后启动。
@@ -273,9 +355,15 @@ Gate：同质量下降低总读取成本，且能从错误调用恢复。该阶�
 2. Qwen3.5-2B 普通/组合 heldout text-CoT probe 已形成正向信号，length-heldout 仍有错误；
 3. 已完成当前结构的 2B V2-A1 `K=8/T=8` latent mechanism smoke、checkpoint/resume、no-bypass 和干预链；
 4. 已完成 A2 K/T（含 K16/T8 与 K8/T2/T4/T16）、prompt contract、source-mean 初始化、copied/MLP transition、latent-attention probe、mean/flatten readout、source reread、token-wise source adapter、full-data、masked state/query-state supervision、step-level verifier RL 以及 0.8B/2B 基座对照；source-layer bank、token mixer 和 latent-attention 的失败入口已删除；2B K8/T8 full-data MLP test `0.6016`，composition-heldout `0.3672`，source adapter bottleneck=128 为 `0.5859/0.4063/0.5078`（test/composition/length），masked state supervision 为 `0.5703/0.3984/0.4219`，latent-attention 为 `0.5078/0.4141/0.4531` 且 no/shuffled latent 均 `0.0938`，verifier-RL 为 `0.5625/0.3906/0.5547` 且状态 verifier 未学会，0.8B 同构 latent test `0.2578`，均未形成相对 text-CoT 的稳定 Pareto，Gate A2 未通过；
-5. 在新的 encoder/latent 信息保真设计形成稳定正向证据前，不执行 A3 audit、A4 formal 或 V2-B0。
+5. A1.6 formal relation Gate 失败后，已通过只读诊断定位 continuous closure 故障；
+6. A1.7 已完成 data、overfit32、三个初始化 seed 的 formal/causal、2×2 结构/closure 消融和 8/12/16 步压力；短程 Gate 为 `3/3`，旧严格长程 Gate 为 `0/3`，closure 的长程价值成立，但地址分离的独立收益未成立；
+7. A1.8 已完成三组独立 data/model seed 的 T1–16 random-depth training、T20/T24 OOD、T32 诊断、因果、稳定性和成本；总 Gate `3/3` 通过，A1.7 漂移主要归因为 horizon mismatch；
+8. A1.9 Qwen hidden boundary 已完成：三组 cache audit、formal 与 hidden causal Gate 均通过，总 Gate `3/3`；
+9. A1.10 已完成 full-token + anonymous K-slot + generic recurrent reasoner 联合切换；overfit32 通过但 formal `0/3`，所有 hidden intervention 按 Gate 停止；
+10. A1.11 正交故障定位已完成：Boundary 严格 overfit pointer Gate failed；exact-symbolic Reasoner overfit passed、formal `0/3`；纯组合故障解释被否定，所有 formal 后干预按 Gate 停止；
+11. 下一阶段为 A1.12 Reasoner 内部最小拆分：只恢复 entity-addressable state workspace，保留 generic learned recurrence；完成前不执行 matched Pareto、A3 audit、A4 formal 或 V2-B0。
 
-当前已有可运行的 V2-A 命令和 smoke artifact，但没有 formal artifact。阶段记录、脚本入口和结果边界见 `docs/v2-a-reasoning-medium-experiment.md`；不得把 smoke 写成 Gate 通过。
+当前已有 A1.8 structured core 到 T24、A1.9 oracle-role-segmented frozen Qwen hidden boundary 的多 seed formal/causal artifact，A1.10 联合目标配置的 `0/3`，以及 A1.11 两臂正交定位 artifact。A1.11 证明 exact-symbolic anonymous reasoner 只有 overfit32 记忆容量、没有大分布逐步算法；Boundary 的离散角色识别可成立但连续 frozen-core 接口不精确。matched Pareto 与完整 V2-A formal artifact 仍不存在。不得把 A1.9 oracle 分段通过、A1.10 partial final-answer 或 A1.11 hard re-embedding 诊断写成完整 V2-A 通过。
 
 ## 8. 担忧与不确定性
 
@@ -294,3 +382,7 @@ Gate：同质量下降低总读取成本，且能从错误调用恢复。该阶�
 13. 首次 step-level verifier self-critical RL full512 probe 使用 v5 有效步骤 mask，结果为 `0.5625/0.3906/0.5547`，test greedy register accuracy `0.0968`、state/final exact 均为 `0`，末尾 policy entropy 约 `0.0017`。RL 已进入反传但发生策略塌缩，不能把 reward loss 或 sampled/greedy reward 当成状态学习证据；后续若重做，必须先解决 reward 信号稀疏和 policy collapse。
 14. 为符合白皮书的 Attention + Dense FFN 参考结构，曾加入 identity-initialized latent-attention transition；full512 的 test/composition/length 为 `0.5078/0.4141/0.4531`，no-latent 与 shuffled-latent 都为 `0.0938`。它没有形成因果递归或 Pareto 优势，当前代码与 CLI 已删除，不保留并列旧入口。
 15. state/query-state supervision 已改为只计真实程序步骤，masked state full512 为 `0.5703/0.3984/0.4219`，但 test/length 仍低于无监督 MLP baseline，且 shuffled-latent 高于 no-latent；mask 修复解决了计量错误，不等于过程监督形成了有效 verifier。
+16. A1.9 的每个 role hidden 都来自 oracle character span，而且 Qwen hidden 本身具有全局上下文；hidden 反事实已经排除多种身份/答案捷径，但不能替代自主 role discovery。
+17. A1.11 已解决 A1.10 的一级归因：exact-symbolic Reasoner formal `0/3`，所以失败不是纯 boundary×reasoner 组合效应；Boundary 也有连续地址几何的严格 overfit 缺陷。仍未解决的是 anonymous slot binding 与 generic transition/目标函数之间的二级归因。
+18. A1.9/A1.10 cache 生成都依赖当前缺少 `flash-linear-attention`/`causal-conv1d` fast path 的 Qwen fallback。A1.10 三组 full-token cache 净编码 `4,767.62` 秒、占用 `38.36` GB，还不含模型/tokenizer 首次加载；cached reasoner 延迟不能与在线 text-CoT 延迟直接比较。
+19. A1.11 Boundary 的 hard re-embedding 是只读诊断，不是被验证的新架构；若未来使用 prototype-anchored/discrete addressing，必须直接切换合同并重新做 fresh formal，不能把诊断偷偷变成兼容补丁。
