@@ -66,6 +66,10 @@ H_t ∈ R^(K × D_latent)
 
 核心可证伪假设是：在保持成熟文本语义能力和按需可审计性的前提下，连续 latent recurrence 能减少强制离散语言化造成的自回归、KV 和模态往返成本，并形成稳定的质量—成本优势。
 
+V2 允许 **混合 core**。完整运行状态可以写为 `S_t = (A_t, H_t)`：`H_t` 是承载判断、工作内容和输出意图的连续 latent workspace；`A_t` 是稳定身份、对象/来源 handle、类型、阶段、权限、预算和读写地址等离散或原型锚定的控制/寻址 sidecar。`A_t` 可以约束 attention 的可见性和读写位置，但不能携带标准答案、完整 teacher state 或替代 `H_t` 完成语义推理。
+
+因此，白皮书不要求对象地址本身必须端到端保持纯连续，也不要求 workspace slots 永久匿名。只要推理语义主要在 `H_t` 中连续递归、每一步不经过词表采样与 token 回嵌、正式输出不能绕过最终 latent state，typed/addressable slots、离散 handle 和 prototype-anchored address 都属于合规实现。把每步语义内容硬量化为任务标签、在推理时注入 oracle state，或用 COPY/SWAP 等任务专用分支替代 learned transition，则不属于该混合边界。
+
 ### 3.2 多模态命题
 
 文本不是所有外部状态的天然最佳中介。视觉空间、动作轨迹、连续传感状态和高熵生成目标若反复转成线性语言，可能损失并行结构和精度。
@@ -142,6 +146,8 @@ V2 降低的是表面文本生成在主推理循环中的支配地位，不是�
 5. 主答案或动作头只能读取最终 latent state，不允许绕过潜变量核心直读原输入或 teacher trace。
 
 这种结构兼顾语义继承和实验归因：它不要求随机模块重新学习全部推理，也不在每个 latent step 运行完整成熟基座。
+
+`K` 个 latent slots 可以全部由 learned queries 初始化，也可以由 Boundary expert 与代码控制面分配稳定 handle/type 后写入连续 payload。handle 只提供身份持续性、合法寻址和来源关联；source/target/query 等需要从输入语义判断的角色必须由 Boundary/Reasoner 学得，不能作为 oracle metadata 注入正式推理。
 
 ### 5.3 第一版参考参数
 

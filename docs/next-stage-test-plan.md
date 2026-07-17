@@ -6,7 +6,7 @@
 
 总路线：`docs/Project-Yggdrasil V2 从架构验证到商用路线图.md`
 
-当前状态：V2-A0 数据/基座链路、2B text-CoT probe 和当前结构的 V2-A1 mechanism smoke 已实现；旧 A2 probe 未形成稳定 Pareto。A1.8 使结构化 core 通过 T24，A1.9 证明 oracle-role-segmented Qwen hidden 可驱动该 frozen core。A1.10–A1.17 把 exact-symbolic Reasoner 的失败定位到 relation-addressed transition、soft closure 与训练目标悖论。A1.18/A1.18B 已解决该诊断 core 的机制层：final-only pooled full-state auxiliary 为 formal/causal `2/3`，每步共享的 global-workspace → complete-state TSAUX 在三个 paired seed 和三个 fresh seed 上均 formal/causal `3/3`；正式 answer CE 为 `0`，部署前辅助参数物理删除。机器分类 `per_step_global_state_credit_assignment_confirmed`。该结论不覆盖逐步 oracle state target 的可扩展来源、learned full-text boundary、匿名 workspace、matched text-CoT、A3/A4 或 V2-B。
+当前状态：V2-A0 数据/基座链路、2B text-CoT probe 和当前结构的 V2-A1 mechanism smoke 已实现；旧 A2 probe 未形成稳定 Pareto。A1.8 使结构化 core 通过 T24，A1.9 证明 oracle-role-segmented Qwen hidden 可驱动该 frozen core。A1.10–A1.17 把 exact-symbolic Reasoner 的失败定位到 relation-addressed transition、soft closure 与训练目标悖论。A1.18/A1.18B 解决诊断 core 的逐步全局状态信用分配，A1.19H 又把固定三寄存器推广为 equality-only opaque handles + variable-cardinality continuous payload，formal/causal `3/3`。A1.20B 的无 oracle full-text Boundary 在 heldout validation 失败后，A1.20C 加入分层 entity/program compiler 与 straight-through execution credit。A1.20C 的训练 token anchors、hard-forward equivalence 和 answer 均通过，但目标臂 overfit32 trajectory/final-state 只有 `0.875/0.90625`；state 与 local compiler objective 的全局梯度 cosine 为 `-0.7366`。完整 2×2、formal/causal、A1.21P、A1.22A 与 V2-B 均未启动，V2-A 当前不通过。
 
 ## 1. 路线直接切换
 
@@ -271,7 +271,41 @@ A1.18B 只改变全局状态监督密度：TSAUX 使用一组跨步共享训练�
 
 formal 前全部 `training_auxiliary_head.*` 参数均物理删除，正式 loader 会拒绝仍含辅助参数的 checkpoint。机器分类为 `per_step_global_state_credit_assignment_confirmed`、`mechanism_solved=true`、`diagnostic_core_architecture_validated=true`。这证明 answer-specific auxiliary 不是必要条件；缺失机制是每一步 global workspace → complete state 的密集信用分配。
 
-下一阶段 A1.19 只处理第二层问题：逐级减少精确 trajectory state 标签密度，比较 masked/partial teacher trajectory、终态 + transition consistency 与自监督 next-state target。完成前不得把 oracle TSAUX 直接推广为开放任务训练方案，也不得直接恢复旧 A2 路线。完整结果见 `docs/v2-a1.18-training-scaffold.md`、`tmp/V2-A1.18 result.md` 与 `artifacts/v2-a/a1_18b/assessment-summary.json`。
+原计划下一阶段直接做 state-target source annealing，现已因路线重审后移。A1.10/A1.11 的匿名通用 reasoner 事实上已经在每个递归步用 workspace mean 预测完整 state 并施加 trajectory CE，但在 exact-symbolic 条件下仍 formal `0/3`；这说明 A1.18B 的成功不能只归因于新增监督，还依赖 relation addressing、显式实体地址和 closure。当前不得先削弱唯一成功配置的监督，也不得直接恢复旧 A2。完整机制结果见 `docs/v2-a1.18-training-scaffold.md`、`tmp/V2-A1.18 result.md` 与 `artifacts/v2-a/a1_18b/assessment-summary.json`。
+
+### 3.14 V2-A1.19H：可泛化混合 core（已完成）
+
+A1.19H 保留 relation-addressed shared transition、soft closure、TSAUX、query-coupled answer 和部署剥离，但分两个顺序子门把固定三寄存器 scaffold 改为任务无关的 addressable hybrid workspace。`H1 opaque-handle` 保持实体数、操作、数据和预算不变，只删除 slot index = register identity，逐样本随机分配 opaque handle 并测试 handle/slot 联合 permutation。H1 formal `3/3` 后才运行 `H2 variable-cardinality`，把实体数量扩展为训练内多个 `N` 与 heldout `N`，其余合同不变。
+
+两个子门均先做 overfit32；通过后使用三个 fresh seed 跑 formal/causal，并测试 OOD horizon、relation holdout、handle permutation/alias、同值不同实体、query swap、旧轨迹拒绝、disable recurrence 和辅助头剥离；H2 另加 OOD entity count。soft continuous addressing 只作 H2 通过后的同预算消融，不是前置 Gate。任一子门 formal 不到 `3/3` 时停止 full-text、Pareto 与 V2-B。新增任务/关系族留到 A1.21P，不在 A1.19H 混入。
+
+A1.19H 已完成。H1 删除 fixed register/slot identity 后 formal/causal `3/3`；H2 在训练 `N=2,3,4`、heldout `N=5` 和 heldout relation 合同下 formal/causal `3/3`。三个 H2 run 的 `N=5` 与 `N=5+relation` trajectory/final/answer 均为 `1.0`，OOD horizon 最低 aggregate trajectory 为 `0.983073`。机器分类 `generalized_hybrid_core_confirmed`、`a119h_complete=true`。部署 artifact 不含训练辅助参数，handle 没有语义 embedding，也不存在 fixed-register 或 task-family-specific executor。
+
+run-3 前发现旧训练管线被 Python→CUDA 标量编码和每步地址校验同步阻塞。新管线使用一次性 validated tensor cache、GPU index-select、预生成采样与 forward 路由预计算；60-step 同初始化对照加速 `10.744×`，final loss 与所有参数差均为 `0`。旧 run-1 checkpoint 的优化后全 split 回归与原 formal JSON 完全相同。完整记录见 `docs/v2-a1.19h-hybrid-core.md`、`tmp/V2-A1.19H result.md` 与 `artifacts/v2-a/a1_19h/assessment-summary.json`。
+
+### 3.15 V2-A1.20B：learned full-text boundary（已停止，失败）
+
+冻结通过的 A1.19H core，使用完整 Qwen hidden 训练 Boundary 自主输出连续 value payload 与必要的 source/target/query handle、relation/type/control。输入不得包含 oracle span mask、oracle role tensor、程序步骤 mask、答案 metadata 或 hard re-embedding 诊断补丁。环境原生 source identity/位置 metadata 可以保留，但任务语义角色必须从完整文本学习。
+
+先做 overfit32，并分别验证 value、source pointer、target pointer、query pointer、relation family 与 handle geometry；全部严格通过后才运行三个 fresh Boundary formal。正式 task Gate 必须覆盖 H2 的 short/in-range/relation/OOD/N5/N5+relation，并在 formal 通过后执行 no-hidden、hidden shuffle、role-preserving text counterfactual、query swap、operation replacement/deletion/shuffle 和 core hash 不变检查。Boundary formal 不到 `3/3` 时停止 A1.21P/A1.22A，不得用 short joint tuning 或 hard re-embedding 掩盖。
+
+A1.20B 通过后进入 A1.21P matched R1 Pareto，再进入 A1.22A natural-language audit。训练目标来源不再是独立硬门：可执行 trace、程序状态和 verifier-filtered teacher record 都允许用于训练，但必须报告生成成本/错误率并在部署前删除辅助路径。零 teacher 与自监督 next-state 降级为可选效率研究。A1.21P/A1.22A 同时通过才关闭 V2-A/R1。路线决策真源见 `docs/v2-a-route-reassessment-2026-07-17.md`。
+
+A1.20B 实际已执行并停止。overfit32 mapping/trajectory/final/answer 全为 `1.0`；run-1 的 full-token cache audit 全通过，固定 5000-step 训练完成，但 best checkpoint 的 2048 条 validation trajectory/final/answer 为 `0.297363/0.409668/0.608887`，最差 cell mapping/trajectory/answer 为 `0.315341/0/0.227273`，没有资格进入 formal split。
+
+逐样本 Boundary 全字段联合 exact 仅 `0.087891`；N4 全部 value 正确仅 `0.007331`，T13–16 的完整 program/source/target 序列 exact 均为 `0`。全 oracle Boundary 使同一 frozen core 恢复 trajectory/final/answer `1.0`，排除 core 失效。state CE 的梯度实测只到 continuous value path，不到 threshold/argmax 后的 entity/operation presence、family、source、target、query logits；完整 loss 只能通过各字段局部 CE 训练这些控制。机器分类 `full_text_entity_binding_and_program_extraction_failure`。
+
+因此 run-1 formal cache/eval、causal、run-2/run-3、A1.21P 与 A1.22A 均按合同未运行。继续前必须重新立项解决 Boundary entity/program binding 与离散控制执行级信用分配；不能直接增加 seed/step，也不能用 hard re-embedding 补丁掩盖。完整记录见 `docs/v2-a1.20b-full-text-boundary.md`、`tmp/V2-A1.20B result.md` 与 `artifacts/v2-a/a1_20b/assessment-summary.json`。
+
+### 3.16 V2-A1.20C：分层编译器 × execution-credit 修复（已停止，失败）
+
+A1.20C 复用 A1.20B 的 frozen full-token Qwen cache、frozen A1.19H-H2 core、数据与 seed，预注册 compiler `flat/hierarchical` × credit `hard-local/straight-through` 2×2。hierarchical compiler 先建立 entity table，再读取 ordered family/source/target 与 query；训练 token anchor target 不进入模型前向。straight-through 模式在 forward 保持 hard prefix mask、family 和 pointer，在 backward 使用 soft surrogate 驱动 frozen core。
+
+目标臂 `hierarchical + straight-through` 的 supervision audit、4 项回归测试和 CUDA smoke 均通过。hard-forward state/answer logit 差为 `0`，core hash 不变。fixed-5000 overfit32 的 best checkpoint 位于 step 4800，anchor all-sequence exact、value、family、answer 均为 `1.0`，但 trajectory/final-state/state-token 只有 `0.875/0.90625/0.964474`，mapping minimum 为 `0.90625`；四条 `N=4` 样本仍有 entity/operation count 与 pointer-validity 联动错误，最差 cell mapping/trajectory 为 `0/0`。
+
+失败根因已进一步定位。pointer local CE 在未执行 predicted entity mask 的 logits 上优化，而实际执行会用 hard entity mask 改写 pointer 候选集合，current ST bridge 未连续化这个 validity-set 决策。best checkpoint 的 state CE 与其余 local mapping/payload/anchor objective 梯度 cosine 全局为 `-0.7366`，entity path 为 `-0.9680`，presence heads 为 `-0.9944`；固定 `3e-4` 学习率又使 total loss 从 step 4800 的 `0.2429` 回升到 step 5000 的 `0.6103`。机器分类 `anchor_localization_solved_but_execution_objectives_conflict`。
+
+因此另外三个 2×2 正式训练臂、heldout validation matrix、三 seed formal/causal、A1.21P 与 A1.22A 均未运行。继续前必须新立项把 entity-count/pointer-validity 联合连续化，分阶段或投影冲突梯度，并引入 joint-stage 学习率衰减；然后从 fresh initialization 重过 overfit32。不能把 anchor 或 answer `1.0` 当作机制通过。完整记录见 `docs/v2-a1.20c-boundary-repair.md`、`tmp/V2-A1.20C result.md` 与 `artifacts/v2-a/a1_20c/overfit32/hierarchical__straight_through/failure-diagnostic.json`。
 
 ## 4. V2-B：多模态与双层 MoE
 
@@ -379,9 +413,11 @@ Gate：同质量下降低总读取成本，且能从错误调用恢复。该阶�
 14. A1.17 同共享初始化配对审计已完成：coupled-CE/noCE 均 `0/3`，独立 pooled-answer objective 的优化脚手架作用成立，但架构未通过；
 15. A1.18 FINAL-SAUX paired formal/causal 为 `2/3`，证明 final-only 全局状态监督可替代答案梯度但 seed 不稳定；
 16. A1.18B TSAUX 已完成三个 paired 与三个 fresh seed：两组 formal/causal 都为 `3/3`，部署辅助头全部删除，机制 Gate 通过；
-17. 下一阶段只允许 A1.19 state-target source annealing；完成前不执行旧 A2、matched Pareto、A3 audit、A4 formal 或 V2-B0。
+17. A1.19H generalized hybrid core 已完成：H1/H2 overfit32、三 seed formal 与 formal 后 causal 均通过，heldout N5 与 N5+relation 三 seed 全通过，机器分类 `generalized_hybrid_core_confirmed`；
+18. A1.20B learned full-text boundary 已完成 run-1 并在 formal 前 eligibility 失败；
+19. A1.20C 分层 compiler × straight-through 修复已完成监督审计、实现、smoke、目标臂 fixed-5000 overfit32 与实际 checkpoint 梯度审计；目标臂 strict Gate 失败，完整 2×2、formal/causal、A1.21P、A1.22A 和 V2-B0 均保持停止。当前没有自动授权的下一阶段，继续前必须先修复 entity-count/pointer-validity 信用和 state-vs-local 负梯度冲突。
 
-当前已有 A1.8 structured core 到 T24、A1.9 oracle-role-segmented frozen Qwen hidden boundary 的多 seed formal/causal artifact，A1.10–A1.17 的分层失败归因，以及 A1.18B TSAUX 六 model seed 的训练目标机制闭环。最新证据证明 relation addressing + closure + per-step global complete-state credit assignment 可以稳定学习 exact-symbolic state，且正式输出不需要答案旁路。matched Pareto 与完整 V2-A formal artifact 仍不存在。不得把 A1.9 oracle 分段或 A1.18B exact-symbolic mechanism Gate 写成完整 V2-A 通过。
+当前已有 A1.8 structured core 到 T24、A1.9 oracle-role-segmented frozen Qwen hidden boundary、A1.10–A1.17 分层失败归因、A1.18B TSAUX 训练机制闭环，以及 A1.19H generalized hybrid core 的多 seed formal/causal artifact。最新证据证明 equality-only opaque addressing + shared continuous transition + closure + per-step global complete-state credit assignment 可以稳定跨实体数量学习 exact-symbolic state，且正式输出不需要答案旁路。A1.20C 又证明 hierarchical token-role localization 可以在 full-text overfit32 学到全 exact，straight-through 也能保持 hard forward 并恢复执行级梯度；但未受约束的 state/local objective 会在 entity count、pointer validity 和 shared reader 上产生强负梯度冲突。learned full-text Boundary、matched Pareto 与完整 V2-A formal artifact 仍不存在。不得把 A1.19H symbolic core Gate 或 A1.20C answer/anchor `1.0` 写成完整 V2-A 通过。
 
 ## 8. 担忧与不确定性
 
@@ -404,4 +440,9 @@ Gate：同质量下降低总读取成本，且能从错误调用恢复。该阶�
 17. A1.18B 已把 A1.17 的辅助梯度拆开：FINAL-SAUX 为 `2/3`，TSAUX paired/fresh 均 formal/causal `3/3`，说明 answer 标签不是必要条件，稳定性来自每步 global workspace → complete state 的密集信用分配。该结论要求后续架构保留 training-only TSAUX 等价机制、state-only checkpoint selection、部署剥离和 causal Gate，不能恢复推理答案旁路。
 18. A1.9/A1.10 cache 生成都依赖当前缺少 `flash-linear-attention`/`causal-conv1d` fast path 的 Qwen fallback。A1.10 三组 full-token cache 净编码 `4,767.62` 秒、占用 `38.36` GB，还不含模型/tokenizer 首次加载；cached reasoner 延迟不能与在线 text-CoT 延迟直接比较。
 19. A1.11 Boundary 的 hard re-embedding 是只读诊断，不是被验证的新架构；若未来使用 prototype-anchored/discrete addressing，必须直接切换合同并重新做 fresh formal，不能把诊断偷偷变成兼容补丁。
-20. 当前 TSAUX 使用每步完整三寄存器 oracle state。它解决训练机制，不解决开放任务的 target 来源；A1.19 必须先验证 partial/masked/teacher/self-supervised state target，不能把合成 oracle 依赖包装成可扩展方案。
+20. 当前 TSAUX 使用每步完整三寄存器 oracle state。它解决结构化 core 的训练机制，不解决开放任务的 target 来源；但白皮书不要求零 teacher 训练。后续允许 executable/verifier-filtered teacher target，必须报告成本、覆盖和错误率，并禁止部署/推理时 teacher 绕过。
+21. 纯匿名 `K-slot` 与全连续寻址都不再被当作必须坚持的核心承诺。当前候选 core 是 `S_t=(A_t,H_t)` relation-addressable hybrid workspace；离散 sidecar 只能承载身份、地址、类型和控制，不能承载答案或完整语义 state。
+22. A1.19H 已通过，但只形成 hybrid core 证据。完整 R1 仍必须在 full-text、同基座、计算匹配条件下形成 Pareto，并训练自然语言 audit readout 通过因果忠实性 Gate；不得用 symbolic trajectory 指标代替 A3/A4。
+23. A1.19H-H2 的旧训练路径存在严重 CPU/GPU 同步浪费。后续 A1.20B–A1.22A 的 cached training 必须在正式启动前做 tensor cache、热路径同步、固定 shape 和吞吐基准审计；GPU 功率不是单独 Gate，step/s、端到端延迟和数值等价才是主指标。
+24. A1.20B 已按上述要求在正式训练前完成 Qwen cache batch benchmark、mmap cached training 与同步/prefetch 对照。低功率的剩余部分来自约 `2.77M` 参数 Boundary、batch 16 和周期性全 validation，而不是逐样本 Qwen 编码。更关键的失败是 threshold/argmax 控制切断 state CE：局部 mapping CE 在 train batch 可接近零，但 heldout 完整程序联合 exact 只有 `0.087891`。下一轮必须先解决执行级离散信用分配和分层 entity/program binding，不能用更高 GPU 利用率替代机制修复。
+25. A1.20C 已把 overfit32 训练推进到约 `4.24 step/s`，GPU 在热路径可达到高利用率；性能不再是本轮失败主因。真正残留的是 pointer-validity 的 hard mask 断点和实际负梯度冲突：state-vs-local 全局 cosine `-0.7366`、presence heads `-0.9944`。下一修复必须改变训练接口和优化顺序，不能只延长固定 `3e-4` 训练。

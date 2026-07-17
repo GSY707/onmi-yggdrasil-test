@@ -85,8 +85,11 @@ flowchart LR
 - learned latent queries 读取基座 hidden states；
 - 复制顶部 2 个 Transformer block 形成独立 recurrent reasoner；
 - 第一版 `K=8`、`T=8`、Dense FFN；
+- 允许离散/prototype-anchored handle、type、address 与 control sidecar 维持对象持续性，但连续 latent payload 必须完成语义更新；
 - 答案头只能读取最终 latent state；
 - reasoner 收敛后单独训练自然语言 audit readout。
+
+混合 core 不降低 Gate R1：正式 full-text 输入中的语义角色必须由 Boundary/Reasoner 学得，不能由 oracle span、role tensor、teacher state 或任务专用执行分支注入。全连续寻址可以作为消融，但不是 R1 的必要条件。
 
 ### Gate R1
 

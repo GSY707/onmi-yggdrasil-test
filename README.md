@@ -1,6 +1,6 @@
 # Project-Yggdrasil V2 研究工作区
 
-本仓库当前只保留 Project-Yggdrasil V2 的架构真源、路线决策、V2-A 分层实验和最近测试计划。A1.8 以 T1–16 均衡训练使结构化 core 通过 T24，A1.9 证明 oracle-role-segmented Qwen hidden 可稳定驱动该 frozen core。A1.10–A1.17 把 exact-symbolic Reasoner 的失败定位到 relation-addressed transition、soft closure 与训练目标悖论；A1.18/A1.18B 已用训练期 TSAUX 解决机制层：每个递归步从全局 workspace 预测完整 state，正式答案始终 query-coupled，部署前物理删除辅助头。三个 paired seed 与三个 fresh seed 的 formal/causal 均为 `3/3`。该结论只验证 exact-symbolic 三寄存器 core，开放任务中的可扩展 state target 来源仍未解决。
+本仓库当前只保留 Project-Yggdrasil V2 的架构真源、路线决策、V2-A 分层实验和最近测试计划。A1.8 以 T1–16 均衡训练使结构化 core 通过 T24，A1.9 证明 oracle-role-segmented Qwen hidden 可稳定驱动该 frozen core。A1.10–A1.18B 完成了 relation transition、closure 与训练期逐步全局状态信用分配的故障定位；A1.19H 进一步把固定三寄存器正控制切换为 equality-only opaque handles + shared continuous payload，并在训练 `N=2,3,4`、heldout `N=5` 上形成 H1/H2 formal/causal `3/3`。A1.20B 的无 oracle learned full-text Boundary 在 heldout validation 失败后，A1.20C 又加入分层 entity/program compiler 与 straight-through execution credit。A1.20C 已把所有训练 token anchor 学到 `1.0`，但目标臂 overfit32 的 trajectory/final-state 仍只有 `0.875/0.90625`；实际梯度审计显示 state 与 local compiler objective 强负冲突。A1.19H core 正证据保留，但 full-text Boundary 与 V2-A 均未通过。
 
 当前主线已经从旧 Stage A—AV-J-C 直接切换为：
 
@@ -29,6 +29,9 @@
 - [V2-A1.16 冗余答案损失](docs/v2-a1.16-redundant-answer-loss.md)：删除重复 answer CE 后仍为 state/full `0/3`。
 - [V2-A1.17 配对目标审计](docs/v2-a1.17-paired-objective-initialization-audit.md)：同 seed、共享初始化位相等的 objective × initialization 根因定位。
 - [V2-A1.18/A1.18B 训练脚手架](docs/v2-a1.18-training-scaffold.md)：FINAL-SAUX `2/3`、逐步全局 TSAUX 六 seed formal/causal、部署剥离和机制结论。
+- [V2-A1.19H 可泛化混合 Core](docs/v2-a1.19h-hybrid-core.md)：opaque handle、可变实体数量、heldout N5、三 seed formal/causal 与参数级等价训练优化。
+- [V2-A1.20B 完整文本 Boundary](docs/v2-a1.20b-full-text-boundary.md)：full-token Qwen cache、无 oracle Boundary、训练吞吐审计、run-1 eligibility 失败、oracle/梯度归因与停线结论。
+- [V2-A1.20C 分层编译与信用修复](docs/v2-a1.20c-boundary-repair.md)：token anchor、entity-table-first compiler、hard-forward straight-through bridge、overfit32 失败、梯度冲突与停线结论。
 - [V2-A 实验脚本](experiments/v2_a_reasoning_medium.py)：数据生成、文本基线和 latent reasoner 入口。
 - [V2-A1.5 实验脚本](experiments/v2_a1_5_latent_foundation.py)：A1.5 数据、P0、P1 cache/train/eval、P2 train/intervention 和 matched text baseline 入口。
 - [V2-A1.7 实验脚本](experiments/v2_a1_7_core.py)：A1.6 closure diagnostic，以及 A1.7 data/audit/train/evaluate/intervene/stress/assessment 入口。
@@ -41,12 +44,15 @@
 - [V2-A1.15/A1.16/A1.17 实验入口](experiments/v2_a1_17_paired_objective_initialization.py)：query-coupled 两种 objective 的训练入口分别见相邻 A1.15/A1.16 脚本，本入口负责 paired 总判定。
 - [V2-A1.18 训练入口](experiments/v2_a1_18_training_scaffold.py)：QAUX、FINAL-SAUX、TSAUX 的 train/evaluate/intervene 与辅助剥离部署入口。
 - [V2-A1.18B 总判定](experiments/v2_a1_18b_trajectory_state_scaffold.py)：FINAL-SAUX、TSAUX paired/fresh 和 causal 的机器聚合入口。
+- [V2-A1.19H 实验入口](experiments/v2_a1_19h_hybrid_core.py)：H1/H2 data/audit/train/benchmark/evaluate/intervene/assess 统一入口。
+- [V2-A1.20B 实验入口](experiments/v2_a1_20b_full_text_boundary.py)：cache/audit/train/evaluate、失败 oracle diagnostic、gradient-credit audit 与 assessment 入口。
+- [V2-A1.20C 实验入口](experiments/v2_a1_20c_boundary_repair.py)：compiler supervision、flat/hierarchical × hard/ST 训练、严格 Gate 与实际 checkpoint 梯度冲突诊断入口。
 - [架构审阅记录](docs/project-yggdrasil-latent-reasoning-architecture-review-2026-07-11.md)：V2 决策形成依据，不与白皮书并行定义规范。
 - [目录索引](docs/DIRECTORY_REFERENCE.md)：当前保留项和归档边界。
 
 ## 当前状态与未完成项
 
-当前可运行 V2-A0、文本基线、A1.5 分层入口、A1.8 structured core、A1.9 frozen-Qwen oracle-role boundary，以及 A1.10–A1.18B 故障定位与机制解决链。FINAL-SAUX 在 paired seed 上 formal/causal `2/3`；把全局完整状态监督扩展到每个递归步后，TSAUX paired 与 fresh 分别 formal/causal `3/3`。机器结论为 `per_step_global_state_credit_assignment_confirmed`、`mechanism_solved=true`、`diagnostic_core_architecture_validated=true`。六个通过模型的正式答案只来自 queried state，部署artifact不含辅助头。下一阶段应验证没有逐步 oracle state 时的 target-source 退火；learned full-text boundary、匿名 workspace、matched text-CoT Pareto、A3/A4 和全部 V2-B 仍未完成。
+当前可运行 V2-A0、文本基线、A1.5 分层入口、A1.8 structured core、A1.9 frozen-Qwen oracle-role boundary，以及 A1.10–A1.20C 的故障定位、训练机制、generalized hybrid core 与 full-text Boundary 修复实验。A1.19H-H1/H2 formal 与 causal 均为 `3/3`；opaque handles 只用于相等寻址，continuous payload 与 shared transition 完成更新，训练辅助头在部署前物理删除。H2 在训练 `N=2,3,4` 后对 heldout `N=5` 与 `N=5+relation` 三 seed 全为 `1.0`。A1.20C 目标臂的 anchors、hard-forward equivalence、answer 与 core integrity 通过，但 overfit32 mapping/trajectory/final-state 未严格全对；state-vs-local 梯度 cosine 为 `-0.7366`，presence heads 为 `-0.9944`。因此 2×2 heldout matrix、formal/causal、A1.21P、A1.22A 均未运行。当前路线停在 V2-A，继续前必须重新立项解决 entity-count/pointer-validity 的可微信用和冲突梯度，不能直接进入 Pareto、audit 或 V2-B。
 
 ## 文件治理原则
 

@@ -6,9 +6,12 @@
 
 | 路径 | 地位与用途 |
 | --- | --- |
-| `docs/Project-Yggdrasil 多模态潜变量推理架构白皮书 V2.md` | 当前唯一目标架构规范；定义连续 latent recurrence、Boundary-MoE、FFN-MoE、审计和边界。 |
+| `docs/Project-Yggdrasil 多模态潜变量推理架构白皮书 V2.md` | 当前唯一目标架构规范；定义连续语义 recurrence、离散地址/控制 + 连续 payload 的合规混合 core 边界、Boundary-MoE、FFN-MoE 与审计。 |
 | `docs/Project-Yggdrasil V2 从架构验证到商用路线图.md` | 当前唯一高层路线；按 Gate 推进 R0、R1/R2/R3、架构完整版和商用路线。 |
-| `docs/next-stage-test-plan.md` | 当前最近执行真源；记录 V2-A/A1.5–A1.18B 的故障定位与机制解决路线、V2-B 顺序、证据口径、Gate、成本和旧路线收口。 |
+| `docs/next-stage-test-plan.md` | 当前最近执行真源；记录 V2-A/A1.5–A1.20C 的故障定位、A1.19H–A1.22A 高保真 R1 收敛路线、V2-B 顺序、证据口径、Gate、成本和旧路线收口。 |
+| `docs/v2-a-route-reassessment-2026-07-17.md` | A1.18B 后路线重审；定义合规混合 core，以及 A1.19H generalized hybrid core、A1.20B/A1.20C full-text boundary、A1.21P Pareto、A1.22A audit 的顺序与停机门。 |
+| `docs/v2-a1.20b-full-text-boundary.md` | A1.20B 无 oracle full-text Boundary 合同、启动前吞吐优化、run-1 eligibility 失败、联合 mapping、oracle 替换、梯度信用审计与停线结论。 |
+| `docs/v2-a1.20c-boundary-repair.md` | A1.20C 分层 compiler × execution-credit 合同、token anchor、ST hard-forward、overfit32 失败、真实梯度冲突与停线结论。 |
 | `docs/project-yggdrasil-latent-reasoning-architecture-review-2026-07-11.md` | V2 决策形成记录；只保存推导和审阅依据，不与白皮书并行定义规范。 |
 | `docs/moe-model-assembly-comparative-review-2026-07-14.md` | V2 的 Boundary-MoE/FFN-MoE 与公开模型路线的中文对照；区分已被其他模型验证的局部思想、完整架构未验证边界和 V2-B 未启动状态。 |
 | `docs/DIRECTORY_REFERENCE.md` | 本索引；新代码、测试、文档和归档必须同步这里。 |
@@ -54,6 +57,8 @@ A1.11 是一级故障定位证据。Boundary 臂在无 oracle span、保留 froz
 A1.12–A1.17 是当前最新二级根因证据。A1.12 BIND/CURSOR/BOTH 均为 formal `0/3`；A1.13 GENERIC-CLOSURE state `0/3`、STRUCTURED-CE `1/3`、STRUCTURED-CLOSURE state `3/3`/full `1/3`；A1.13F fixed 4000-step 排除 early-stop 主因。A1.15/A1.16 的 query-coupled + CE/noCE fresh seed 均 state/full `0/3`。A1.17 在 A1.13 三个成功 model/data seed 上验证全部共享初始 tensor 位相等后重跑，两条 coupled 臂仍均 state/full `0/3`。机器分类 `independent_answer_auxiliary_gradient_required`：当前 state 学习依赖独立 pooled-answer objective 的全局辅助梯度，但该旁路不能形成可靠因果答案。根因在 exact-symbolic 三寄存器合同内已定位，架构未通过；下一阶段只允许 training-only QAUX/SAUX 目标重设。真源见 `docs/v2-a1.12-reasoner-root-cause.md` 至 `docs/v2-a1.17-paired-objective-initialization-audit.md`、`tmp/V2-A1.12-A1.17 root-cause result.md` 与各阶段 assessment。
 
 A1.18/A1.18B 是当前最新训练机制证据。QAUX/FINAL-SAUX overfit32 通过；FINAL-SAUX paired formal/causal 为 `2/3`，证明 final-only 全局完整状态梯度方向正确但 seed 不稳定。TSAUX 用一组跨步共享训练头在每个递归步从 global workspace mean 预测完整 state；三个 paired seed 与三个 fresh model seed 的 formal/causal 均为 `3/3`。六个通过部署模型的 causal trajectory/answer 都为 `1.0`，全部反事实 Gate 通过，disable-recurrence 与 wrong-start trajectory 都为 `0`；formal 前辅助参数已物理删除。机器分类 `per_step_global_state_credit_assignment_confirmed`、`mechanism_solved=true`。结论只覆盖 exact-symbolic 三寄存器 core；逐步 oracle state target 的开放任务来源仍未解决。真源见 `docs/v2-a1.18-training-scaffold.md`、`tmp/V2-A1.18 result.md` 与 `artifacts/v2-a/a1_18b/assessment-summary.json`。
+
+2026-07-17 白皮书与路线重审已接受 `S_t=(A_t,H_t)` 合规混合 core：离散/prototype-anchored sidecar 只承载身份、地址、类型和控制，连续 `H_t` 承载语义推理。A1.19H-H1/H2 已完成 formal/causal `3/3`；训练 `N=2,3,4` 后 heldout `N=5` 与 `N=5+relation` 三 seed 全通过，机器分类 `generalized_hybrid_core_confirmed`。A1.20B 无 oracle learned full-text Boundary 在 heldout validation eligibility 失败后，A1.20C 加入 hierarchical entity/program compiler 与 straight-through execution credit。A1.20C 目标臂 anchors 和 answer 为 `1.0`，但 overfit32 trajectory/final-state 仅 `0.875/0.90625`；state-vs-local 全局梯度 cosine 为 `-0.7366`，机器分类 `anchor_localization_solved_but_execution_objectives_conflict`。完整 2×2、formal/causal、A1.21P、A1.22A 和 V2-B 均未启动；当前没有自动授权的下一阶段。
 
 ## 当前 V2-A 代码与测试
 
@@ -125,6 +130,25 @@ A1.18/A1.18B 是当前最新训练机制证据。QAUX/FINAL-SAUX overfit32 通�
 | `src/yggdrasil_v2/reasoning_medium/a1_18b_assessment.py` | FINAL-SAUX、TSAUX paired/fresh、seed/budget/target/deployment integrity 与机制分类。 | `per_step_global_state_credit_assignment_confirmed` |
 | `experiments/v2_a1_18_training_scaffold.py` | QAUX/FINAL-SAUX/TSAUX train/evaluate/intervene CLI。 | A1.18/A1.18B 统一执行入口 |
 | `experiments/v2_a1_18b_trajectory_state_scaffold.py` | A1.18B 过拟合、FINAL-SAUX、TSAUX paired/fresh 的机器总判定入口。 | 当前机制 assessment 入口 |
+| `src/yggdrasil_v2/reasoning_medium/a1_19h_data.py` | opaque-handle 编码、随机语义到物理 slot 映射、批量索引/GPU 搬运与缓存期地址完整性校验。 | A1.19H 共享数据边界；热路径不再执行 CUDA 标量校验 |
+| `src/yggdrasil_v2/reasoning_medium/a1_19h_model.py` | equality-only opaque address sidecar、exchangeable continuous entity payload、共享 transition/state head 与 query-coupled answer。 | A1.19H generalized hybrid core 实现 |
+| `src/yggdrasil_v2/reasoning_medium/a1_19h_train.py` | H1 fixed-cardinality 训练、辅助剥离部署、formal 与状态评测。 | H1 formal/causal `3/3` |
+| `src/yggdrasil_v2/reasoning_medium/a1_19h_h2_data.py` | N2/N3/N4 训练、N5 heldout、relation heldout、独立数据 seed 与 overlap audit。 | H2 variable-cardinality 数据合同 |
+| `src/yggdrasil_v2/reasoning_medium/a1_19h_h2_train.py` | H2 固定预算训练、一次性 CPU 编码/GPU tensor cache、预生成采样、无逐步 CUDA 同步的 loss、cached formal 与吞吐等价基准。 | run-3 fresh 重跑入口；60-step 参数级等价基准为 `10.74×` |
+| `src/yggdrasil_v2/reasoning_medium/a1_19h_{interventions,assessment}.py` | H1 structural/address/recurrence 干预与三 seed 汇总。 | H1 机器 Gate 已通过 |
+| `src/yggdrasil_v2/reasoning_medium/a1_19h_h2_{interventions,assessment}.py` | H2 N5/address/recurrence 干预与 H1+H2 总判定。 | H2 formal/causal `3/3`；A1.19H 已关闭通过 |
+| `experiments/v2_a1_19h_hybrid_core.py` | H1/H2 prepare、audit、train、benchmark、evaluate、intervene、assess 统一 CLI。 | A1.19H 可复现历史入口 |
+| `src/yggdrasil_v2/reasoning_medium/a1_20b_cache.py` | H2 数据上的完整 Qwen last-hidden 分片 cache、strict audit 与 mmap dataset；禁止保存 span/role/entity mask/operation mask/input IDs。 | A1.20B full-text 输入合同 |
+| `src/yggdrasil_v2/reasoning_medium/a1_20b_model.py` | 共享 entity/operation typed queries，自主预测 entity/operation presence、value、family、source/target/query pointer，并把连续 value payload 送入冻结 A1.19H core。 | A1.20B Boundary 实现；无 oracle mask 输入 |
+| `src/yggdrasil_v2/reasoning_medium/a1_20b_train.py` | Boundary factorized mapping/state loss、冻结 core hash、N/T 均衡采样、overfit/formal evaluator、同步 mmap training 与吞吐对照。 | run-1 fixed-5000 已完成；formal eligibility 失败 |
+| `src/yggdrasil_v2/reasoning_medium/a1_20b_diagnostics.py` | 选择性 oracle 替换、逐样本联合 mapping exact 与 state CE→离散控制 logits 梯度信用审计。 | A1.20B 失败归因；oracle 只作诊断 |
+| `src/yggdrasil_v2/reasoning_medium/a1_20b_assessment.py` | overfit/cache/training/oracle/gradient evidence 的机器总判定与停线列表。 | `full_text_entity_binding_and_program_extraction_failure` |
+| `experiments/v2_a1_20b_full_text_boundary.py` | cache/audit/train/evaluate、diagnose、gradient-audit、assess-failure CLI。 | A1.20B 可复现失败入口；不得继续 run-2/run-3 |
+| `src/yggdrasil_v2/reasoning_medium/a1_20c_supervision.py` | 从 tokenizer offset 生成 entity name/value、operation family/source/target、query 的训练专用 token anchor target，并审计 target 不进入 forward。 | A1.20C compiler supervision；overfit/run-1 audit 通过 |
+| `src/yggdrasil_v2/reasoning_medium/a1_20c_model.py` | flat/hierarchical compiler × hard-local/ST wrapper；hierarchical entity table、ordered operation reader、hard-forward soft-backward frozen-core bridge。 | A1.20C 目标结构实现；目标臂 overfit Gate 失败 |
+| `src/yggdrasil_v2/reasoning_medium/a1_20c_train.py` | anchor + mapping + state loss、overfit/formal eligibility、hard-forward equivalence、core hash 与 checkpoint。 | fixed-5000 目标臂已完成；不得进入 matrix/formal |
+| `src/yggdrasil_v2/reasoning_medium/a1_20c_diagnostics.py` | 对实际 checkpoint 计算 state-vs-local 参数梯度夹角、失败 cell、late regression 与停线分类。 | `anchor_localization_solved_but_execution_objectives_conflict` |
+| `experiments/v2_a1_20c_boundary_repair.py` | prepare/audit supervision、2×2 arm train 与 diagnose-overfit CLI。 | A1.20C 可复现失败入口；后续臂按 Gate 未运行 |
 | `src/yggdrasil_v2/reasoning_medium/a1_5_p1.py` | Qwen3.5-2B FP16 hidden cache、operation span token mask、P1 hidden-to-latent interface。 | A1.5 P1 mechanism/surrogate probe |
 | `src/yggdrasil_v2/reasoning_medium/a1_5_p1_train.py` | P1 hidden cache training、start/query/operation warm-up、state/final CE、best reload 和多 split 诊断。 | A1.5 P1 surrogate formal；ordinary validation 通过 |
 | `src/yggdrasil_v2/reasoning_medium/a1_5_p2.py` | K=8 learned multi-slot workspace、共享 transition、无答案旁路和 permutation probe。 | A1.5 P2 formal core；composition 失败 |
@@ -150,6 +174,9 @@ A1.18/A1.18B 是当前最新训练机制证据。QAUX/FINAL-SAUX overfit32 通�
 | `tests/test_v2_a1_12_root_cause.py` | binding/cursor 唯一变量、forward shape、训练合同和分类。 | A1.12 完整性单元测试 |
 | `tests/test_v2_a1_13_transition_closure.py` | transition/closure/coupled/noCE 合同、loss 差分、配对初始化逐 tensor 等同和 A1.13F–A1.17 分类。 | A1.13–A1.17 完整性单元测试 |
 | `tests/test_v2_a1_18_training_scaffold.py` | QAUX 初始化等同、SAUX/TSAUX shape/gradient、query-coupled answer、训练期限定、物理部署剥离和 A1.18B 分类。 | A1.18/A1.18B 完整性单元测试 |
+| `tests/test_v2_a1_19h_hybrid_core.py` | opaque-handle/slot 等变、辅助剥离、H2 N5 合同、缓存编码等价、冻结 loss 与缓存期严格地址校验。 | A1.19H 完整性与训练优化回归测试 |
+| `tests/test_v2_a1_20b_full_text_boundary.py` | continuous-payload core 等价、Boundary 无 oracle mask/role 输入、冻结 core 梯度隔离、N/T sampler、oracle 诊断选择与 hard-control state-credit 断裂。 | A1.20B 架构/训练/归因合同测试 |
+| `tests/test_v2_a1_20c_boundary_repair.py` | token anchor 角色、flat-hard 等价、hierarchical no-oracle forward、ST hard-forward 等价与 state gradient 恢复。 | A1.20C 4 项回归测试通过 |
 | `tests/conftest.py` | 为当前 CPU torchvision wheel 预声明缺失的 NMS operator，保证 Transformers 测试收集可重复；不改变模型运行语义。 | 测试环境隔离 |
 
 本地 `artifacts/v2-a/` 被 `.gitignore` 忽略；阶段结果路径、配置和证据等级必须以对应阶段文档与本目录索引为准，不把未索引的本地文件当作 repo truth。
@@ -258,7 +285,52 @@ A1.18/A1.18B 是当前最新训练机制证据。QAUX/FINAL-SAUX overfit32 通�
 | `artifacts/v2-a/a1_18b/runs/run-{1,2,3}/tsaux/` | TSAUX paired fixed-4000 training、辅助剥离formal与causal。 | formal/causal `3/3` |
 | `artifacts/v2-a/a1_18b/fresh/run-{1,2,3}/tsaux/` | model seed `20261821/22/23` 的 TSAUX fresh fixed-4000 training、部署formal与causal。 | formal/causal `3/3` |
 | `artifacts/v2-a/a1_18b/assessment-summary.json` | overfit、FINAL-SAUX、TSAUX paired/fresh、完整性、成本和边界的机器总判定。 | `mechanism_solved=true`；当前机制机器真源 |
-| `tmp/V2-A1.18 result.md` | A1.18/A1.18B 结果、根因、完成/未完成边界和 A1.19 建议。 | 当前人类可读机制交接 |
+| `tmp/V2-A1.18 result.md` | A1.18/A1.18B 结果、根因、完成/未完成边界，以及已被 2026-07-17 路线重审后移的原 A1.19 建议。 | 当前人类可读机制交接 |
+
+## A1.19H 运行产物
+
+| 路径 | 内容 | 当前地位 |
+| --- | --- | --- |
+| `artifacts/v2-a/a1_19h/h1/` | H1 overfit32、三组 fixed-cardinality formal、structural/address/recurrence 干预与 assessment。 | formal/causal `3/3`；`opaque_handle_hybrid_core_confirmed` |
+| `artifacts/v2-a/a1_19h/h2/overfit32/` | N2/N3/N4、T1–16 cell-balanced fit-only checkpoint/results。 | 严格 overfit Gate 通过 |
+| `artifacts/v2-a/a1_19h/h2/runs/run-{1,2,3}/data/` | 三组独立 data seed 的 N2–N5、relation/OOD/causal 数据。 | 三组 data audit 通过；跨 run fingerprint 排除生效 |
+| `artifacts/v2-a/a1_19h/h2/runs/run-{1,2}/formal/` | 两组 fixed-4000 variable-cardinality checkpoint、部署模型和 formal eval。 | N2–N5 与 relation Gate 全通过；causal intervention 全通过 |
+| `artifacts/v2-a/a1_19h/h2/throughput-optimization.json` | 旧逐步 CUDA 编码/同步与新 GPU-cache 管线的同初始化同 batch 序列 60-step 对照。 | `10.744×`；final loss delta `0`；parameter max delta `0` |
+| `artifacts/v2-a/a1_19h/h2/runs/run-1/formal/formal-eval-optimized-regression.json` | 优化后 forward/cached evaluator 对旧 run-1 checkpoint 的全 split 回归。 | 原/新 gates 与 splits 逐字段完全相同 |
+| `artifacts/v2-a/a1_19h/h2/runs/run-3/formal/` | model/data/mapping seed `20261963/20261953/20261973` 的 fresh optimized fixed-4000 formal。 | formal/causal 通过；训练 `155.52s`、`25.72 step/s` |
+| `artifacts/v2-a/a1_19h/assessment-summary.json` | H1、H2 overfit、三数据 audit、三 run formal/causal 与完整性聚合。 | `generalized_hybrid_core_confirmed`；A1.19H 机器真源 |
+| `docs/v2-a1.19h-hybrid-core.md` | 架构合同、方法修正、H1/H2 结果、吞吐等价与证据边界。 | A1.19H 人类可读正式记录 |
+| `tmp/V2-A1.19H result.md` | 完成/未完成项、异常修正与 A1.20B 交接。 | 当前阶段结果交接 |
+
+## A1.20B 运行产物
+
+| 路径 | 内容 | 当前地位 |
+| --- | --- | --- |
+| `artifacts/v2-a/a1_20b/overfit32/` | 32 条 N2–N4/T1–16 full-token cache、audit、fresh checkpoint 与逐 cell 结果。 | mapping/trajectory/final/answer 全 `1.0`；fit-only sanity 通过 |
+| `artifacts/v2-a/a1_20b/qwen-cache-batch-benchmark.json` | batch 8/12/16 的真实 full-text Qwen 编码 wall time、real tokens/s 与 peak allocation。 | 选择 batch 12，`2602.43 real tokens/s` |
+| `artifacts/v2-a/a1_20b/runs/run-1/train-cache/` | train 16,384 + validation 2,048 条 FP16 Qwen last-hidden mmap shards；共 `5,594,417` source tokens。 | full-text Boundary run-1 输入；无 oracle 字段 |
+| `artifacts/v2-a/a1_20b/runs/run-1/train-cache-audit.json` | schema/hash/source/shape/finite/fingerprint/overlap/no-oracle/no-truncation Gate。 | 全部通过 |
+| `artifacts/v2-a/a1_20b/training-pipeline-benchmark.json` | 同 schedule/initialization 的同步 mmap 与后台 pinned prefetch 20-step 对照。 | prefetch 仅 `0.939×` 且非参数级等价；正式保留同步路径 |
+| `artifacts/v2-a/a1_20b/runs/run-1/formal/results.json` | reader seed `20262011` 的 fixed-5000 Boundary training 与 2048 条 heldout validation。 | trajectory/final/answer `0.297363/0.409668/0.608887`；formal eligibility 失败 |
+| `artifacts/v2-a/a1_20b/runs/run-1/formal/failure-diagnostic.json` | 15 个选择性 oracle 条件、联合 Boundary/program/address exact 与 N/T 分组。 | full oracle core `1.0`；value/source/target binding 为 primary failure |
+| `artifacts/v2-a/a1_20b/runs/run-1/formal/gradient-credit-audit.json` | state CE-only 与 full factorized loss 对各 Boundary logits 的梯度范数。 | state CE 到六类离散控制 logits 全为 `0`；hard-control credit 断裂确认 |
+| `artifacts/v2-a/a1_20b/assessment-summary.json` | overfit、cache、run-1、oracle、gradient、未运行阶段与证据边界的机器聚合。 | `a120b_passed=false`；A1.21P/A1.22A 不允许 |
+| `docs/v2-a1.20b-full-text-boundary.md` | 正式合同、优化、结果、根因与路线判断。 | A1.20B 人类可读正式记录 |
+| `tmp/V2-A1.20B result.md` | 完成/未完成项与停线交接。 | 当前阶段结果交接 |
+
+## A1.20C 运行产物
+
+| 路径 | 内容 | 当前地位 |
+| --- | --- | --- |
+| `artifacts/v2-a/a1_20c/overfit32/supervision/` | overfit32 train/validation token anchor target 与 manifest。 | 训练专用；不进入 forward |
+| `artifacts/v2-a/a1_20c/overfit32/supervision-audit.json` | token offset、shape/range、source 对齐与 no-forward-input 审计。 | 全部 Gate 通过 |
+| `artifacts/v2-a/a1_20c/runs/run-1/supervision/` | 16,384 train + 2,048 validation 的 compiler anchor target。 | 已准备；正式 matrix 因 target overfit 失败未使用 |
+| `artifacts/v2-a/a1_20c/runs/run-1/supervision-audit.json` | run-1 compiler supervision 审计。 | 全部 Gate 通过 |
+| `artifacts/v2-a/a1_20c/smoke/hierarchical__straight_through/` | 2-step CUDA smoke、checkpoint 与 hard-forward equivalence。 | state/answer logit delta `0/0` |
+| `artifacts/v2-a/a1_20c/overfit32/hierarchical__straight_through/results.json` | fresh fixed-5000 目标臂 overfit32 结果。 | trajectory/final/state-token/answer `0.875/0.90625/0.964474/1.0`；strict Gate 失败 |
+| `artifacts/v2-a/a1_20c/overfit32/hierarchical__straight_through/failure-diagnostic.json` | 四个失败 N4 cell、state-vs-local 梯度夹角、late regression 与停止列表。 | 机器分类 `anchor_localization_solved_but_execution_objectives_conflict` |
+| `docs/v2-a1.20c-boundary-repair.md` | 2×2 合同、实现、overfit、梯度冲突、Gate 与下一修复边界。 | A1.20C 人类可读正式记录 |
+| `tmp/V2-A1.20C result.md` | 已完成/未完成项与停线交接。 | 当前阶段结果交接 |
 
 ## A1.5 运行产物
 
