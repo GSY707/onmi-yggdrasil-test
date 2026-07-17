@@ -1,6 +1,6 @@
 # Project-Yggdrasil V2 研究工作区
 
-本仓库当前只保留 Project-Yggdrasil V2 的架构真源、路线决策、V2-A 分层实验和最近测试计划。A1.8 以 T1–16 均衡训练使结构化 core 通过 T24，A1.9 证明 oracle-role-segmented Qwen hidden 可稳定驱动该 frozen core。A1.10 的 full-token + anonymous `K=8` + generic recurrence 联合配置 formal `0/3`；A1.11 随后完成正交定位：learned full-text Boundary 存在连续地址接口缺陷，exact-symbolic typed roles 输入匿名通用 reasoner 仍为 formal `0/3`。因此失败不是两个健康组件的纯组合效应，主要独立风险已定位到匿名 state binding／generic transition／当前 readout objective 这一整臂。
+本仓库当前只保留 Project-Yggdrasil V2 的架构真源、路线决策、V2-A 分层实验和最近测试计划。A1.8 以 T1–16 均衡训练使结构化 core 通过 T24，A1.9 证明 oracle-role-segmented Qwen hidden 可稳定驱动该 frozen core。A1.10–A1.17 把 exact-symbolic Reasoner 的失败定位到 relation-addressed transition、soft closure 与训练目标悖论；A1.18/A1.18B 已用训练期 TSAUX 解决机制层：每个递归步从全局 workspace 预测完整 state，正式答案始终 query-coupled，部署前物理删除辅助头。三个 paired seed 与三个 fresh seed 的 formal/causal 均为 `3/3`。该结论只验证 exact-symbolic 三寄存器 core，开放任务中的可扩展 state target 来源仍未解决。
 
 当前主线已经从旧 Stage A—AV-J-C 直接切换为：
 
@@ -22,6 +22,13 @@
 - [V2-A1.9 冻结 Qwen hidden 边界记录](docs/v2-a1.9-qwen-boundary.md)：三组真实 Qwen role cache、adapter-only formal、hidden 反事实、成本与严格证据边界。
 - [V2-A1.10 完整文本匿名工作区记录](docs/v2-a1.10-anonymous-workspace.md)：full-token cache、匿名 K-slot、通用 recurrent reasoner、方法修正、三 seed 正式失败与成本边界。
 - [V2-A1.11 正交故障定位记录](docs/v2-a1.11-fault-localization.md)：Boundary strict-overfit 诊断、exact-symbolic Reasoner 三 seed formal、2×2 归因和证据边界。
+- [V2-A1.12 Reasoner 根因拆分](docs/v2-a1.12-reasoner-root-cause.md)：binding × cursor 三臂合同、formal `0/3` 和排除结论。
+- [V2-A1.13 Transition × Closure](docs/v2-a1.13-transition-closure-root-cause.md)：relation transition、soft closure、state/full 分离和因果结果。
+- [V2-A1.13F Fixed-budget 审计](docs/v2-a1.13f-fixed-budget-method-audit.md)：固定 4000-step 排除 early-stop 主因。
+- [V2-A1.15 Query-coupled core](docs/v2-a1.15-closed-coupled-core.md)：query-coupled + answer CE 的 fresh-seed 失败。
+- [V2-A1.16 冗余答案损失](docs/v2-a1.16-redundant-answer-loss.md)：删除重复 answer CE 后仍为 state/full `0/3`。
+- [V2-A1.17 配对目标审计](docs/v2-a1.17-paired-objective-initialization-audit.md)：同 seed、共享初始化位相等的 objective × initialization 根因定位。
+- [V2-A1.18/A1.18B 训练脚手架](docs/v2-a1.18-training-scaffold.md)：FINAL-SAUX `2/3`、逐步全局 TSAUX 六 seed formal/causal、部署剥离和机制结论。
 - [V2-A 实验脚本](experiments/v2_a_reasoning_medium.py)：数据生成、文本基线和 latent reasoner 入口。
 - [V2-A1.5 实验脚本](experiments/v2_a1_5_latent_foundation.py)：A1.5 数据、P0、P1 cache/train/eval、P2 train/intervention 和 matched text baseline 入口。
 - [V2-A1.7 实验脚本](experiments/v2_a1_7_core.py)：A1.6 closure diagnostic，以及 A1.7 data/audit/train/evaluate/intervene/stress/assessment 入口。
@@ -29,12 +36,17 @@
 - [V2-A1.9 实验脚本](experiments/v2_a1_9_boundary.py)：A1.9 cache/audit/train/evaluate/intervene/cost/assessment 入口。
 - [V2-A1.10 实验脚本](experiments/v2_a1_10_anonymous_workspace.py)：full-token cache/audit、匿名 reasoner train/evaluate、formal 后干预、cost/assessment 入口。
 - [V2-A1.11 实验脚本](experiments/v2_a1_11_localization.py)：Boundary/Reasoner 两臂 train/evaluate、Gate 后干预和 2×2 assessment 入口。
+- [V2-A1.12 实验脚本](experiments/v2_a1_12_root_cause.py)：binding/cursor train/evaluate/intervene/assess 入口。
+- [V2-A1.13 实验脚本](experiments/v2_a1_13_transition_closure.py)：transition/closure train/evaluate/intervene/assess 与 fixed-budget audit 入口。
+- [V2-A1.15/A1.16/A1.17 实验入口](experiments/v2_a1_17_paired_objective_initialization.py)：query-coupled 两种 objective 的训练入口分别见相邻 A1.15/A1.16 脚本，本入口负责 paired 总判定。
+- [V2-A1.18 训练入口](experiments/v2_a1_18_training_scaffold.py)：QAUX、FINAL-SAUX、TSAUX 的 train/evaluate/intervene 与辅助剥离部署入口。
+- [V2-A1.18B 总判定](experiments/v2_a1_18b_trajectory_state_scaffold.py)：FINAL-SAUX、TSAUX paired/fresh 和 causal 的机器聚合入口。
 - [架构审阅记录](docs/project-yggdrasil-latent-reasoning-architecture-review-2026-07-11.md)：V2 决策形成依据，不与白皮书并行定义规范。
 - [目录索引](docs/DIRECTORY_REFERENCE.md)：当前保留项和归档边界。
 
 ## 当前状态与未完成项
 
-当前可运行 V2-A0、文本基线、A1.5 分层入口、A1.8 structured core、A1.9 frozen-Qwen oracle-role boundary、A1.10 联合目标配置和 A1.11 正交定位。A1.11 Boundary 的 trajectory/answer/mapping overfit 为 `1.0`，但 source/target pointer 最低为 `0.9643`；只读 hard re-embedding 全通过，formal 按 Gate 停止。A1.11 exact-symbolic Reasoner overfit32 全通过，但三组 formal 为 `0/3`，训练子集 trajectory 也接近 `0`；所有 ordinary formal 失败的干预均未运行。当前对“V2-A 形成 matched text-CoT 质量—成本 Pareto”的工程判断调整为 `22%–35%`、中心约 `28%`；这不是统计置信区间。下一阶段 A1.12 只恢复最小 entity-addressable state workspace，继续隔离 anonymous binding 与 generic transition。A3/A4 和全部 V2-B 仍未启动。
+当前可运行 V2-A0、文本基线、A1.5 分层入口、A1.8 structured core、A1.9 frozen-Qwen oracle-role boundary，以及 A1.10–A1.18B 故障定位与机制解决链。FINAL-SAUX 在 paired seed 上 formal/causal `2/3`；把全局完整状态监督扩展到每个递归步后，TSAUX paired 与 fresh 分别 formal/causal `3/3`。机器结论为 `per_step_global_state_credit_assignment_confirmed`、`mechanism_solved=true`、`diagnostic_core_architecture_validated=true`。六个通过模型的正式答案只来自 queried state，部署artifact不含辅助头。下一阶段应验证没有逐步 oracle state 时的 target-source 退火；learned full-text boundary、匿名 workspace、matched text-CoT Pareto、A3/A4 和全部 V2-B 仍未完成。
 
 ## 文件治理原则
 

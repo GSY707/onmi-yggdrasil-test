@@ -1,12 +1,12 @@
 # 下一阶段测试任务规划
 
-日期：2026-07-16
+日期：2026-07-17
 
 架构真源：`docs/Project-Yggdrasil 多模态潜变量推理架构白皮书 V2.md`
 
 总路线：`docs/Project-Yggdrasil V2 从架构验证到商用路线图.md`
 
-当前状态：V2-A0 数据/基座链路、2B text-CoT probe 和当前结构的 V2-A1 mechanism smoke 已实现；旧 A2 probe 未形成稳定 Pareto。A1.8 使结构化 core 通过 T24，A1.9 证明 oracle-role-segmented Qwen hidden 可驱动该 frozen core。A1.10 full-token Qwen hidden + 匿名 `K=8` workspace + 通用 recurrent Transformer formal `0/3`。A1.11 已完成正交定位：learned full-text Boundary 在严格 pointer overfit Gate 失败，hard re-embedding 诊断全通过；exact-symbolic typed roles → anonymous generic reasoner overfit32 通过但 formal 稳定 `0/3`，且训练子集 trajectory 仍接近 `0`。因此 A1.10 不是纯组合故障，主要独立失败源位于匿名 binding／generic transition／当前 readout objective 这一整臂；二者内部尚未分开。matched text-CoT、A3/A4/V2-B 未启动。
+当前状态：V2-A0 数据/基座链路、2B text-CoT probe 和当前结构的 V2-A1 mechanism smoke 已实现；旧 A2 probe 未形成稳定 Pareto。A1.8 使结构化 core 通过 T24，A1.9 证明 oracle-role-segmented Qwen hidden 可驱动该 frozen core。A1.10–A1.17 把 exact-symbolic Reasoner 的失败定位到 relation-addressed transition、soft closure 与训练目标悖论。A1.18/A1.18B 已解决该诊断 core 的机制层：final-only pooled full-state auxiliary 为 formal/causal `2/3`，每步共享的 global-workspace → complete-state TSAUX 在三个 paired seed 和三个 fresh seed 上均 formal/causal `3/3`；正式 answer CE 为 `0`，部署前辅助参数物理删除。机器分类 `per_step_global_state_credit_assignment_confirmed`。该结论不覆盖逐步 oracle state target 的可扩展来源、learned full-text boundary、匿名 workspace、matched text-CoT、A3/A4 或 V2-B。
 
 ## 1. 路线直接切换
 
@@ -255,11 +255,23 @@ Reasoner 在精确输入下独立失败，已经否定“两个健康组件只�
 
 当前对 V2-A 形成 matched text-CoT 质量—成本 Pareto 的工程判断调整为 `22%–35%`、中心约 `28%`，完整白皮书 V2 为 `10%–22%`。这不是统计置信区间；下调来自 exact-symbolic 条件仍无法形成大分布逐步算法，保留的上行空间来自 A1.8/A1.9 已证明最小结构化状态与真实 Qwen hidden 分别可工作。
 
-### 3.12 V2-A1.12：Reasoner 内部最小拆分（下一阶段，未预注册）
+### 3.12 V2-A1.12–A1.17：Reasoner 二级根因定位（已完成）
 
-下一阶段只恢复最小 entity-addressable state workspace，同时保留 exact symbolic roles、通用 learned recurrent block、相同训练长度和相同 readout Gate。该单因子实验回答匿名 slot binding 是否为主要故障；如果通过，再判断 structured transition 是否仍有必要；如果仍失败，故障将更集中到 operation-step alignment、generic transition 或目标函数。
+A1.12 的 BIND/CURSOR/BOTH 三臂均先过 overfit32、随后 formal `0/3`，排除 entity-addressable state 与 aligned operation cursor 的独立/联合充分性。A1.13 的 GENERIC-CLOSURE state `0/3`、STRUCTURED-CE `1/3`、STRUCTURED-CLOSURE state `3/3`/full `1/3`；唯一完整通过 run 的因果干预通过。A1.13F 固定 4000-step 后三条单因素参考仍为 state `0/3`、`0/3`、`1/3`，所以 early-stop 不是主因。
 
-本阶段不得直接恢复完整 A1.8 COPY/SWAP core，不得同时修改 workspace、transition、loss 和 curriculum，也不得把 Boundary hard re-embedding 混入。A1.12 完成前不重启 full-text formal，不做 A1.10 宽度/层数 sweep。
+A1.15 query-coupled + answer CE 与 A1.16 query-coupled + no answer CE 均 overfit32 通过、新 seed state/full `0/3`。A1.17 回到 A1.13 的 model seed `20261321/22/23`，逐 tensor 验证共享初始化位相等；paired coupled-CE 和 coupled-noCE 仍分别为 state/full `0/3`，而 independent pooled-answer reference state `3/3`。机器分类为 `independent_answer_auxiliary_gradient_required`：当前 state 算法依赖独立 pooled-answer objective 的全局辅助梯度，但该旁路本身不能成为可靠因果答案接口。
+
+该结论触发并约束了 A1.18：推理答案固定为 query-coupled state，训练期只允许不进入部署图的全局辅助目标，禁止恢复推理答案旁路。
+
+### 3.13 V2-A1.18/A1.18B：训练目标机制解决（已完成）
+
+QAUX 与 FINAL-SAUX 的 overfit32 均通过。QAUX 只作实现阳性控制；FINAL-SAUX 从最终 workspace mean 预测完整三寄存器终态，paired seed formal/causal 为 `2/3`。两个通过run在辅助头删除后通过 relation、T24 与全部因果干预；失败seed从 step `200` 到 `4000` 始终没有进入算法盆地，因此 final-only 全局状态梯度方向正确但初始化不稳定。
+
+A1.18B 只改变全局状态监督密度：TSAUX 使用一组跨步共享训练头，在每个递归步从 global workspace mean 预测当步完整三寄存器 state；正式 answer CE 保持 `0`。它先在 FINAL-SAUX 失败的相同 seed 上于 step `600` 修复 state，随后统一重跑三个 paired seed，再用 model seed `20261821/22/23` 做三个 fresh run。paired 与 fresh 的 formal/causal 都为 `3/3`；六个部署模型的 causal trajectory/answer 都为 `1.0`，全部 counterfactual Gate 通过，disable-recurrence 和 wrong-start trajectory 都为 `0`。
+
+formal 前全部 `training_auxiliary_head.*` 参数均物理删除，正式 loader 会拒绝仍含辅助参数的 checkpoint。机器分类为 `per_step_global_state_credit_assignment_confirmed`、`mechanism_solved=true`、`diagnostic_core_architecture_validated=true`。这证明 answer-specific auxiliary 不是必要条件；缺失机制是每一步 global workspace → complete state 的密集信用分配。
+
+下一阶段 A1.19 只处理第二层问题：逐级减少精确 trajectory state 标签密度，比较 masked/partial teacher trajectory、终态 + transition consistency 与自监督 next-state target。完成前不得把 oracle TSAUX 直接推广为开放任务训练方案，也不得直接恢复旧 A2 路线。完整结果见 `docs/v2-a1.18-training-scaffold.md`、`tmp/V2-A1.18 result.md` 与 `artifacts/v2-a/a1_18b/assessment-summary.json`。
 
 ## 4. V2-B：多模态与双层 MoE
 
@@ -361,9 +373,15 @@ Gate：同质量下降低总读取成本，且能从错误调用恢复。该阶�
 8. A1.9 Qwen hidden boundary 已完成：三组 cache audit、formal 与 hidden causal Gate 均通过，总 Gate `3/3`；
 9. A1.10 已完成 full-token + anonymous K-slot + generic recurrent reasoner 联合切换；overfit32 通过但 formal `0/3`，所有 hidden intervention 按 Gate 停止；
 10. A1.11 正交故障定位已完成：Boundary 严格 overfit pointer Gate failed；exact-symbolic Reasoner overfit passed、formal `0/3`；纯组合故障解释被否定，所有 formal 后干预按 Gate 停止；
-11. 下一阶段为 A1.12 Reasoner 内部最小拆分：只恢复 entity-addressable state workspace，保留 generic learned recurrence；完成前不执行 matched Pareto、A3 audit、A4 formal 或 V2-B0。
+11. A1.12 binding × cursor 已完成：三臂 overfit32 全通过、formal 全为 `0/3`，两项候选不足；
+12. A1.13 transition × closure 与 A1.13F fixed-budget audit 已完成：联合臂 state `3/3`/full `1/3`，单因素臂不稳定且不是 early-stop 主导；
+13. A1.15/A1.16 fresh-seed query-coupled 两臂均 state/full `0/3`；
+14. A1.17 同共享初始化配对审计已完成：coupled-CE/noCE 均 `0/3`，独立 pooled-answer objective 的优化脚手架作用成立，但架构未通过；
+15. A1.18 FINAL-SAUX paired formal/causal 为 `2/3`，证明 final-only 全局状态监督可替代答案梯度但 seed 不稳定；
+16. A1.18B TSAUX 已完成三个 paired 与三个 fresh seed：两组 formal/causal 都为 `3/3`，部署辅助头全部删除，机制 Gate 通过；
+17. 下一阶段只允许 A1.19 state-target source annealing；完成前不执行旧 A2、matched Pareto、A3 audit、A4 formal 或 V2-B0。
 
-当前已有 A1.8 structured core 到 T24、A1.9 oracle-role-segmented frozen Qwen hidden boundary 的多 seed formal/causal artifact，A1.10 联合目标配置的 `0/3`，以及 A1.11 两臂正交定位 artifact。A1.11 证明 exact-symbolic anonymous reasoner 只有 overfit32 记忆容量、没有大分布逐步算法；Boundary 的离散角色识别可成立但连续 frozen-core 接口不精确。matched Pareto 与完整 V2-A formal artifact 仍不存在。不得把 A1.9 oracle 分段通过、A1.10 partial final-answer 或 A1.11 hard re-embedding 诊断写成完整 V2-A 通过。
+当前已有 A1.8 structured core 到 T24、A1.9 oracle-role-segmented frozen Qwen hidden boundary 的多 seed formal/causal artifact，A1.10–A1.17 的分层失败归因，以及 A1.18B TSAUX 六 model seed 的训练目标机制闭环。最新证据证明 relation addressing + closure + per-step global complete-state credit assignment 可以稳定学习 exact-symbolic state，且正式输出不需要答案旁路。matched Pareto 与完整 V2-A formal artifact 仍不存在。不得把 A1.9 oracle 分段或 A1.18B exact-symbolic mechanism Gate 写成完整 V2-A 通过。
 
 ## 8. 担忧与不确定性
 
@@ -383,6 +401,7 @@ Gate：同质量下降低总读取成本，且能从错误调用恢复。该阶�
 14. 为符合白皮书的 Attention + Dense FFN 参考结构，曾加入 identity-initialized latent-attention transition；full512 的 test/composition/length 为 `0.5078/0.4141/0.4531`，no-latent 与 shuffled-latent 都为 `0.0938`。它没有形成因果递归或 Pareto 优势，当前代码与 CLI 已删除，不保留并列旧入口。
 15. state/query-state supervision 已改为只计真实程序步骤，masked state full512 为 `0.5703/0.3984/0.4219`，但 test/length 仍低于无监督 MLP baseline，且 shuffled-latent 高于 no-latent；mask 修复解决了计量错误，不等于过程监督形成了有效 verifier。
 16. A1.9 的每个 role hidden 都来自 oracle character span，而且 Qwen hidden 本身具有全局上下文；hidden 反事实已经排除多种身份/答案捷径，但不能替代自主 role discovery。
-17. A1.11 已解决 A1.10 的一级归因：exact-symbolic Reasoner formal `0/3`，所以失败不是纯 boundary×reasoner 组合效应；Boundary 也有连续地址几何的严格 overfit 缺陷。仍未解决的是 anonymous slot binding 与 generic transition/目标函数之间的二级归因。
+17. A1.18B 已把 A1.17 的辅助梯度拆开：FINAL-SAUX 为 `2/3`，TSAUX paired/fresh 均 formal/causal `3/3`，说明 answer 标签不是必要条件，稳定性来自每步 global workspace → complete state 的密集信用分配。该结论要求后续架构保留 training-only TSAUX 等价机制、state-only checkpoint selection、部署剥离和 causal Gate，不能恢复推理答案旁路。
 18. A1.9/A1.10 cache 生成都依赖当前缺少 `flash-linear-attention`/`causal-conv1d` fast path 的 Qwen fallback。A1.10 三组 full-token cache 净编码 `4,767.62` 秒、占用 `38.36` GB，还不含模型/tokenizer 首次加载；cached reasoner 延迟不能与在线 text-CoT 延迟直接比较。
 19. A1.11 Boundary 的 hard re-embedding 是只读诊断，不是被验证的新架构；若未来使用 prototype-anchored/discrete addressing，必须直接切换合同并重新做 fresh formal，不能把诊断偷偷变成兼容补丁。
+20. 当前 TSAUX 使用每步完整三寄存器 oracle state。它解决训练机制，不解决开放任务的 target 来源；A1.19 必须先验证 partial/masked/teacher/self-supervised state target，不能把合成 oracle 依赖包装成可扩展方案。

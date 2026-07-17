@@ -8,16 +8,23 @@
 | --- | --- |
 | `docs/Project-Yggdrasil 多模态潜变量推理架构白皮书 V2.md` | 当前唯一目标架构规范；定义连续 latent recurrence、Boundary-MoE、FFN-MoE、审计和边界。 |
 | `docs/Project-Yggdrasil V2 从架构验证到商用路线图.md` | 当前唯一高层路线；按 Gate 推进 R0、R1/R2/R3、架构完整版和商用路线。 |
-| `docs/next-stage-test-plan.md` | 当前最近执行真源；记录 V2-A/A1.5–A1.11 结果、A1.12 Reasoner 内部最小拆分方向、V2-B 顺序、证据口径、Gate、成本和旧路线收口。 |
+| `docs/next-stage-test-plan.md` | 当前最近执行真源；记录 V2-A/A1.5–A1.18B 的故障定位与机制解决路线、V2-B 顺序、证据口径、Gate、成本和旧路线收口。 |
 | `docs/project-yggdrasil-latent-reasoning-architecture-review-2026-07-11.md` | V2 决策形成记录；只保存推导和审阅依据，不与白皮书并行定义规范。 |
 | `docs/moe-model-assembly-comparative-review-2026-07-14.md` | V2 的 Boundary-MoE/FFN-MoE 与公开模型路线的中文对照；区分已被其他模型验证的局部思想、完整架构未验证边界和 V2-B 未启动状态。 |
 | `docs/DIRECTORY_REFERENCE.md` | 本索引；新代码、测试、文档和归档必须同步这里。 |
-| `README.md` | 面向仓库使用者的当前状态说明；展示 A1.9 正证据、A1.10 联合失败、A1.11 一级归因和严格的未完成边界。 |
+| `README.md` | 面向仓库使用者的当前状态说明；展示 A1.9 正证据、A1.10–A1.18B 根因/机制链和严格的未完成边界。 |
 | `docs/v2-a-reasoning-medium-experiment.md` | V2-A 当前实现合同、Qwen3.5 基座、数据 schema、A0/A1/A2 结果、Gate 判定和失败边界。 |
 | `docs/v2-a1.5-latent-foundation.md` | A1.5 独立 schema、P0 结构化正控制、P1 Qwen hidden 接口、P2 learned-slot formal、因果干预和停止门禁。 |
 | `docs/v2-a1.9-qwen-boundary.md` | A1.9 冻结 Qwen hidden → 冻结 A1.8 structured core 的预注册合同、三 run formal/causal 结果、成本、捷径干预和证据边界。 |
 | `docs/v2-a1.10-anonymous-workspace.md` | A1.10 full-token frozen-Qwen cache、匿名 K-slot workspace、通用 recurrent reasoner、方法修正、三 run formal 失败、成本和证据边界。 |
 | `docs/v2-a1.11-fault-localization.md` | A1.11 Boundary × Reasoner 2×2 合同、方法纠正、严格 overfit/formal 结果、一级故障归因和 A1.12 边界。 |
+| `docs/v2-a1.12-reasoner-root-cause.md` | A1.12 binding × cursor 正交拆分、三臂 formal 失败和排除结论。 |
+| `docs/v2-a1.13-transition-closure-root-cause.md` | A1.13 transition identity × latent closure 正交矩阵、三 seed formal/causal 结果和 state/answer 分离判定。 |
+| `docs/v2-a1.13f-fixed-budget-method-audit.md` | A1.13F 固定 4000-step 审计；排除 early-stop 作为单因素臂不稳定的主要解释。 |
+| `docs/v2-a1.15-closed-coupled-core.md` | A1.15 query-coupled readout 合同、overfit 正控制和 fresh-seed formal `0/3` 结果。 |
+| `docs/v2-a1.16-redundant-answer-loss.md` | A1.16 删除重复 answer CE 的唯一变量实验；fresh-seed formal `0/3`。 |
+| `docs/v2-a1.17-paired-objective-initialization-audit.md` | A1.17 同 seed/同共享初始化的 objective × initialization 配对审计合同与最终归因。 |
+| `docs/v2-a1.18-training-scaffold.md` | A1.18 FINAL-SAUX `2/3`、A1.18B TSAUX paired/fresh 六 seed formal/causal、部署剥离、机制结论和 state-target 来源边界。 |
 | `docs/v2-a1.6-core.md` | A1.6 relation-addressed continuous state core 的数据合同、结构完整性、C0 停止点和证据边界。 |
 | `docs/v2-a1.7-core.md` | A1.6 closure 归因、A1.7 受控 relation 数据、三 seed formal/causal、2×2 消融、8/12/16 步压力与成功概率真源。 |
 | `docs/v2-a1.8-long-horizon.md` | A1.8 T1–16 均衡随机深度合同、三组独立 data/model seed、T20/T24 Gate、T32 诊断、稳定性、成本和归因真源。 |
@@ -42,7 +49,11 @@ A1.9 是当前最新 boundary 证据：冻结 Qwen3.5-2B 与三组已经通过�
 
 A1.10 是联合目标配置的失败证据：在同一轮删除 oracle span mask 和显式三寄存器 scaffold，使用 frozen Qwen3.5-2B 的完整 last-hidden + attention mask、匿名 `K=8` learned slots，以及两层参数共享的通用 recurrent Transformer。修正版 overfit32 通过，但三个独立 data/model seed 正式 Gate 为 `0/3`，hidden interventions 按停止规则未运行。该阶段自身不能单独归因，后续 A1.11 已补齐正交诊断。真源见 `docs/v2-a1.10-anonymous-workspace.md`、`tmp/V2-A1.10 result.md` 与 `artifacts/v2-a/a1_10/assessment-summary.json`。
 
-A1.11 是当前最新故障定位证据。Boundary 臂在无 oracle span、保留 frozen A1.8 core 的修正合同下，overfit32 trajectory/answer/mapping 全为 `1.0`，但 source/target pointer 最低均为 `0.9642857143`，严格 Gate failed；只读 hard re-embedding 全部恢复 `1.0`，所以存在连续 latent → frozen address geometry 缺陷，但 task-level formal 未运行。Reasoner 臂直接使用 exact symbolic typed roles，不加载 Qwen/cache/adapter/core；overfit32 全通过，三组 formal 稳定 `0/3`，全部主要 trajectory 为 `0–0.003906`，训练集均衡诊断 trajectory 也只有 `0–0.003906`。这足以否定纯组合故障并把主要独立失败源定位到 anonymous binding／generic transition／当前 readout objective 这一整臂，但尚未拆开三者。当前 V2-A matched Pareto 工程判断为 `22%–35%`、中心约 `28%`。真源见 `docs/v2-a1.11-fault-localization.md`、`tmp/V2-A1.11 result.md` 与 `artifacts/v2-a/a1_11/assessment-summary.json`。
+A1.11 是一级故障定位证据。Boundary 臂在无 oracle span、保留 frozen A1.8 core 的修正合同下，overfit32 trajectory/answer/mapping 全为 `1.0`，但 source/target pointer 最低均为 `0.9642857143`，严格 Gate failed；只读 hard re-embedding 全部恢复 `1.0`，所以存在连续 latent → frozen address geometry 缺陷，但 task-level formal 未运行。Reasoner 臂直接使用 exact symbolic typed roles，不加载 Qwen/cache/adapter/core；overfit32 全通过，三组 formal 稳定 `0/3`，全部主要 trajectory 为 `0–0.003906`，训练集均衡诊断 trajectory 也只有 `0–0.003906`。这足以否定纯组合故障并把主要独立失败源定位到 anonymous binding／generic transition／当前 readout objective 这一整臂，但尚未拆开三者。当前 V2-A matched Pareto 工程判断为 `22%–35%`、中心约 `28%`。真源见 `docs/v2-a1.11-fault-localization.md`、`tmp/V2-A1.11 result.md` 与 `artifacts/v2-a/a1_11/assessment-summary.json`。
+
+A1.12–A1.17 是当前最新二级根因证据。A1.12 BIND/CURSOR/BOTH 均为 formal `0/3`；A1.13 GENERIC-CLOSURE state `0/3`、STRUCTURED-CE `1/3`、STRUCTURED-CLOSURE state `3/3`/full `1/3`；A1.13F fixed 4000-step 排除 early-stop 主因。A1.15/A1.16 的 query-coupled + CE/noCE fresh seed 均 state/full `0/3`。A1.17 在 A1.13 三个成功 model/data seed 上验证全部共享初始 tensor 位相等后重跑，两条 coupled 臂仍均 state/full `0/3`。机器分类 `independent_answer_auxiliary_gradient_required`：当前 state 学习依赖独立 pooled-answer objective 的全局辅助梯度，但该旁路不能形成可靠因果答案。根因在 exact-symbolic 三寄存器合同内已定位，架构未通过；下一阶段只允许 training-only QAUX/SAUX 目标重设。真源见 `docs/v2-a1.12-reasoner-root-cause.md` 至 `docs/v2-a1.17-paired-objective-initialization-audit.md`、`tmp/V2-A1.12-A1.17 root-cause result.md` 与各阶段 assessment。
+
+A1.18/A1.18B 是当前最新训练机制证据。QAUX/FINAL-SAUX overfit32 通过；FINAL-SAUX paired formal/causal 为 `2/3`，证明 final-only 全局完整状态梯度方向正确但 seed 不稳定。TSAUX 用一组跨步共享训练头在每个递归步从 global workspace mean 预测完整 state；三个 paired seed 与三个 fresh model seed 的 formal/causal 均为 `3/3`。六个通过部署模型的 causal trajectory/answer 都为 `1.0`，全部反事实 Gate 通过，disable-recurrence 与 wrong-start trajectory 都为 `0`；formal 前辅助参数已物理删除。机器分类 `per_step_global_state_credit_assignment_confirmed`、`mechanism_solved=true`。结论只覆盖 exact-symbolic 三寄存器 core；逐步 oracle state target 的开放任务来源仍未解决。真源见 `docs/v2-a1.18-training-scaffold.md`、`tmp/V2-A1.18 result.md` 与 `artifacts/v2-a/a1_18b/assessment-summary.json`。
 
 ## 当前 V2-A 代码与测试
 
@@ -92,6 +103,28 @@ A1.11 是当前最新故障定位证据。Boundary 臂在无 oracle span、保�
 | `src/yggdrasil_v2/reasoning_medium/a1_11_interventions.py` | 两臂 ordinary-formal 后 counterfactual、disable recurrence 与 slot permutation。 | 已实现；本轮无 run 通过 ordinary formal，故未执行 |
 | `src/yggdrasil_v2/reasoning_medium/a1_11_assessment.py` | A1.9/A1.10 参考格、两臂 overfit/formal、停止顺序与 2×2 一级归因。 | A1.11 机器总判定；纯组合解释 rejected |
 | `experiments/v2_a1_11_localization.py` | Boundary/Reasoner train/evaluate、Gate 后 intervention 和 assess 统一 CLI。 | 当前 A1.11 历史入口；下一阶段应新建 A1.12 合同 |
+| `src/yggdrasil_v2/reasoning_medium/a1_12_models.py` | exact-symbolic A1.11 Reasoner 的 entity binding 与 aligned cursor 两个正交开关。 | A1.12 诊断模型；三臂均不足 |
+| `src/yggdrasil_v2/reasoning_medium/a1_12_train.py` | A1.12 overfit/formal、统一 Gate、checkpoint 与评估。 | A1.12 三臂 formal `0/3` |
+| `src/yggdrasil_v2/reasoning_medium/a1_12_interventions.py` | ordinary formal 后的结构反事实、recurrence 与 start-state 干预。 | 因 formal 全失败未执行 |
+| `src/yggdrasil_v2/reasoning_medium/a1_12_assessment.py` | binding × cursor 三臂机器汇总与严格分类。 | `binding_and_cursor_insufficient` |
+| `experiments/v2_a1_12_root_cause.py` | A1.12 train/evaluate/intervene/assess CLI。 | A1.12 可复现实验入口 |
+| `src/yggdrasil_v2/reasoning_medium/a1_13_models.py` | relation-addressed transition、soft prototype closure、query-coupled answer 与训练期 QAUX/SAUX/TSAUX 受控头。 | A1.13–A1.18B 诊断核心；不是完整 V2-A |
+| `src/yggdrasil_v2/reasoning_medium/a1_13_train.py` | A1.13–A1.17 训练、formal Gate、可选固定预算与 answer-loss 唯一变量。 | transition/closure/objective 归因实现 |
+| `src/yggdrasil_v2/reasoning_medium/a1_13_interventions.py` | relation/OOD/causal ordinary pass 后的反事实与 recurrence 干预。 | A1.13 joint run-2 causal 通过 |
+| `src/yggdrasil_v2/reasoning_medium/a1_13_assessment.py` | transition × closure 2×2 聚合、state/full 分离和自适应分类。 | A1.13 joint state `3/3`、full `1/3` |
+| `src/yggdrasil_v2/reasoning_medium/a1_13f_assessment.py` | 固定预算三臂审计与 early-stop 判定。 | early-stop primary=false |
+| `src/yggdrasil_v2/reasoning_medium/a1_15_assessment.py` | query-coupled 三 seed formal/causal 聚合。 | A1.15 state/full `0/3` |
+| `src/yggdrasil_v2/reasoning_medium/a1_16_assessment.py` | no-answer-CE 三 seed formal/causal 与触发条件聚合。 | A1.16 state/full `0/3` |
+| `src/yggdrasil_v2/reasoning_medium/a1_17_assessment.py` | 配对 seed、共享初始化逐 tensor 等同性、两种 coupled objective 与 A1.13 reference 的机器归因。 | A1.17 最终根因判定实现 |
+| `experiments/v2_a1_13_transition_closure.py` | A1.13 train/evaluate/intervene/assess 与 A1.13F audit CLI。 | transition × closure 主入口 |
+| `experiments/v2_a1_15_closed_coupled_core.py` | A1.15 train/evaluate/intervene/assess CLI。 | query-coupled + answer CE 入口 |
+| `experiments/v2_a1_16_redundant_answer_loss.py` | A1.16 train/evaluate/intervene/assess CLI。 | query-coupled + no answer CE 入口 |
+| `experiments/v2_a1_17_paired_objective_initialization.py` | 聚合 A1.17 paired reference、coupled-CE 与 coupled-noCE。 | A1.17 assessment 入口 |
+| `src/yggdrasil_v2/reasoning_medium/a1_18_train.py` | QAUX/FINAL-SAUX/TSAUX 训练、state-only checkpoint、固定 formal budget、辅助剥离部署与 formal loader。 | A1.18/A1.18B 长期训练合同实现 |
+| `src/yggdrasil_v2/reasoning_medium/a1_18_interventions.py` | 只接受辅助剥离部署模型的 structural/query/same-answer/recurrence/start-state 因果干预。 | TSAUX paired/fresh causal 均 `3/3` |
+| `src/yggdrasil_v2/reasoning_medium/a1_18b_assessment.py` | FINAL-SAUX、TSAUX paired/fresh、seed/budget/target/deployment integrity 与机制分类。 | `per_step_global_state_credit_assignment_confirmed` |
+| `experiments/v2_a1_18_training_scaffold.py` | QAUX/FINAL-SAUX/TSAUX train/evaluate/intervene CLI。 | A1.18/A1.18B 统一执行入口 |
+| `experiments/v2_a1_18b_trajectory_state_scaffold.py` | A1.18B 过拟合、FINAL-SAUX、TSAUX paired/fresh 的机器总判定入口。 | 当前机制 assessment 入口 |
 | `src/yggdrasil_v2/reasoning_medium/a1_5_p1.py` | Qwen3.5-2B FP16 hidden cache、operation span token mask、P1 hidden-to-latent interface。 | A1.5 P1 mechanism/surrogate probe |
 | `src/yggdrasil_v2/reasoning_medium/a1_5_p1_train.py` | P1 hidden cache training、start/query/operation warm-up、state/final CE、best reload 和多 split 诊断。 | A1.5 P1 surrogate formal；ordinary validation 通过 |
 | `src/yggdrasil_v2/reasoning_medium/a1_5_p2.py` | K=8 learned multi-slot workspace、共享 transition、无答案旁路和 permutation probe。 | A1.5 P2 formal core；composition 失败 |
@@ -114,6 +147,9 @@ A1.11 是当前最新故障定位证据。Boundary 臂在无 oracle span、保�
 | `tests/test_v2_a1_9_boundary.py` | oracle role cache 审计、共享 register adapter、冻结 core、无 full-source path 和 mapping/trajectory 反传合同。 | A1.9 边界完整性单元测试 |
 | `tests/test_v2_a1_10_anonymous_workspace.py` | full-token cache 禁止项、匿名 slot 对称性、通用共享 recurrence、无 scaffold/bypass、统一 recurrent budget 和干预合同。 | A1.10 架构与实验合同单元测试 |
 | `tests/test_v2_a1_11_localization.py` | Boundary 无 span/frozen core、Reasoner exact-symbolic/no-Qwen/no-core、固定 recurrent budget 与 2×2 分类。 | A1.11 正交隔离合同单元测试 |
+| `tests/test_v2_a1_12_root_cause.py` | binding/cursor 唯一变量、forward shape、训练合同和分类。 | A1.12 完整性单元测试 |
+| `tests/test_v2_a1_13_transition_closure.py` | transition/closure/coupled/noCE 合同、loss 差分、配对初始化逐 tensor 等同和 A1.13F–A1.17 分类。 | A1.13–A1.17 完整性单元测试 |
+| `tests/test_v2_a1_18_training_scaffold.py` | QAUX 初始化等同、SAUX/TSAUX shape/gradient、query-coupled answer、训练期限定、物理部署剥离和 A1.18B 分类。 | A1.18/A1.18B 完整性单元测试 |
 | `tests/conftest.py` | 为当前 CPU torchvision wheel 预声明缺失的 NMS operator，保证 Transformers 测试收集可重复；不改变模型运行语义。 | 测试环境隔离 |
 
 本地 `artifacts/v2-a/` 被 `.gitignore` 忽略；阶段结果路径、配置和证据等级必须以对应阶段文档与本目录索引为准，不把未索引的本地文件当作 repo truth。
@@ -193,6 +229,36 @@ A1.11 是当前最新故障定位证据。Boundary 臂在无 oracle span、保�
 | `artifacts/v2-a/a1_11/runs/run-{1,2,3}/reasoner/formal/` | 三组独立 data/reasoner seed 的 checkpoint、history、训练子集诊断和六 split formal eval。 | formal `0/3`；ordinary 后干预未运行 |
 | `artifacts/v2-a/a1_11/assessment-summary.json` | A1.9/A1.10 参考格、两臂 Gate、执行顺序、证据边界和一级归因。 | 当前 A1.11 机器真源；combination-only rejected，architecture not validated |
 | `tmp/V2-A1.11 result.md` | 方法纠正、两臂结果、可能机制、完成/未完成项和 A1.12 建议。 | 人类可读结果交接 |
+
+## A1.12–A1.17 运行产物
+
+| 路径 | 内容 | 当前地位 |
+| --- | --- | --- |
+| `artifacts/v2-a/a1_12/overfit32/{bind,cursor,both}/` | 三条唯一变量臂的 length-balanced fit-only checkpoint/results。 | 三臂 overfit 均通过 |
+| `artifacts/v2-a/a1_12/runs/run-{1,2,3}/{bind,cursor,both}/` | 九个 fresh formal checkpoint、训练与六 split 评估。 | formal 全 `0/3`；无干预 |
+| `artifacts/v2-a/a1_12/assessment-summary.json` | binding × cursor 聚合。 | `binding_and_cursor_insufficient` |
+| `artifacts/v2-a/a1_13/overfit32/` | GENERIC-CLOSURE、STRUCTURED-CE、STRUCTURED-CLOSURE fit-only 正控制。 | 三臂均通过 |
+| `artifacts/v2-a/a1_13/runs/run-{1,2,3}/` | transition × closure formal 与 Gate 后干预。 | 联合臂 state `3/3`、full `1/3`；run-2 causal 通过 |
+| `artifacts/v2-a/a1_13/assessment-summary.json` | state/full 分离的三臂与 A1.12 reference 聚合。 | overall `seed_unstable_inconclusive`；联合 state 稳定 |
+| `artifacts/v2-a/a1_13f/runs/run-{1,2,3}/` | GENERIC-CE、GENERIC-CLOSURE、STRUCTURED-CE 的固定 4000-step 审计；复用原本已满预算的配对 run。 | state `0/3`、`0/3`、`1/3` |
+| `artifacts/v2-a/a1_13f/assessment-summary.json` | 固定预算与 ordinary formal 的方法学判定。 | `fixed_budget_seed_instability_persists`；early-stop primary=false |
+| `artifacts/v2-a/a1_15/` | query-coupled + answer CE overfit、三 fresh formal 与 assessment。 | overfit passed；state/full `0/3` |
+| `artifacts/v2-a/a1_16/` | query-coupled + no answer CE overfit、三 fresh formal 与 assessment。 | overfit passed；state/full `0/3` |
+| `artifacts/v2-a/a1_17/runs/run-{1,2,3}/{coupled_ce,coupled_noce}/` | A1.13 成功 seed 的两种 paired objective；共享初始化位相等。 | 两臂 state/full 均 `0/3` |
+| `artifacts/v2-a/a1_17/assessment-summary.json` | reference、paired seed、共享初始化 tensor identity 与两臂正式结果。 | `independent_answer_auxiliary_gradient_required`；root localized，architecture not validated |
+| `tmp/V2-A1.12-A1.17 root-cause result.md` | 故障排除链、最终判断、证据边界、完成/未完成项与 A1.18 建议。 | 当前人类可读根因交接 |
+
+## A1.18/A1.18B 运行产物
+
+| 路径 | 内容 | 当前地位 |
+| --- | --- | --- |
+| `artifacts/v2-a/a1_18/overfit/{qaux,saux}/` | QAUX 与 FINAL-SAUX length-balanced overfit32、训练checkpoint和辅助剥离部署artifact。 | 两臂严格 overfit Gate 通过 |
+| `artifacts/v2-a/a1_18/runs/run-{1,2,3}/saux/` | FINAL-SAUX paired fixed-4000 training、部署formal与通过run干预。 | formal/causal `2/3`；final-only state credit seed 不稳定 |
+| `artifacts/v2-a/a1_18b/overfit/tsaux/` | 在 FINAL-SAUX 失败seed上的 TSAUX overfit32 正控制。 | step 4000 严格通过 |
+| `artifacts/v2-a/a1_18b/runs/run-{1,2,3}/tsaux/` | TSAUX paired fixed-4000 training、辅助剥离formal与causal。 | formal/causal `3/3` |
+| `artifacts/v2-a/a1_18b/fresh/run-{1,2,3}/tsaux/` | model seed `20261821/22/23` 的 TSAUX fresh fixed-4000 training、部署formal与causal。 | formal/causal `3/3` |
+| `artifacts/v2-a/a1_18b/assessment-summary.json` | overfit、FINAL-SAUX、TSAUX paired/fresh、完整性、成本和边界的机器总判定。 | `mechanism_solved=true`；当前机制机器真源 |
+| `tmp/V2-A1.18 result.md` | A1.18/A1.18B 结果、根因、完成/未完成边界和 A1.19 建议。 | 当前人类可读机制交接 |
 
 ## A1.5 运行产物
 
