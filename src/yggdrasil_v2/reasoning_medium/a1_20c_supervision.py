@@ -38,27 +38,49 @@ def _record_char_targets(
 ) -> tuple[list[int], list[int], list[list[int]], int]:
     question = str(record["question"])
     entity_names = list(record["entity_names"])
+    routing = str(record.get("task_family", "")).startswith(
+        "signal_routing_relay_exchange"
+    )
     entity_name_positions: list[int] = []
     entity_value_positions: list[int] = []
-    cursor = question.index("Objects:") + len("Objects:")
+    entity_marker = "Stations:" if routing else "Objects:"
+    cursor = question.index(entity_marker) + len(entity_marker)
     for name in entity_names:
         name_position, cursor = _find_after(question, name, cursor)
         entity_name_positions.append(name_position)
-        _, cursor = _find_after(question, "=", cursor)
+        if routing:
+            _, cursor = _find_after(question, " carries ", cursor)
+        else:
+            _, cursor = _find_after(question, "=", cursor)
         value = str(record["start_state"][name])
         value_position, cursor = _find_after(question, value, cursor)
         entity_value_positions.append(value_position)
 
-    cursor = question.index("Operations:") + len("Operations:")
+    operation_marker = "Dispatch plan:" if routing else "Operations:"
+    cursor = question.index(operation_marker) + len(operation_marker)
     operation_positions: list[list[int]] = []
     for operation in record["operations"]:
+        family = (
+            "RELAY"
+            if routing and operation["family"] == "copy"
+            else "EXCHANGE"
+            if routing and operation["family"] == "swap"
+            else str(operation["family"]).upper()
+        )
         family_position, cursor = _find_after(
-            question, str(operation["family"]).upper(), cursor
+            question, family, cursor
         )
         source_position, cursor = _find_after(
             question, str(operation["source"]), cursor
         )
-        _, cursor = _find_after(question, "->", cursor)
+        separator = (
+            "=>"
+            if routing and operation["family"] == "copy"
+            else "<=>"
+            if routing
+            else "->"
+        )
+        _, cursor = _find_after(question, separator, cursor)
         target_position, cursor = _find_after(
             question, str(operation["target"]), cursor
         )
@@ -66,7 +88,8 @@ def _record_char_targets(
             [family_position, source_position, target_position]
         )
 
-    query_cursor = question.rindex("Query:") + len("Query:")
+    query_marker = "Inspect station:" if routing else "Query:"
+    query_cursor = question.rindex(query_marker) + len(query_marker)
     query_position, _ = _find_after(
         question, str(record["query_register"]), query_cursor
     )
@@ -335,4 +358,3 @@ class A120CSupervisionSplit:
             .index_select(0, index)
             .to(device),
         )
-

@@ -1,21 +1,27 @@
 # Directory Reference
 
-本仓库是 Project-Yggdrasil V2 的独立研究工作区。当前主线已经从旧 Stage A—AV-J-C 直接切换到 V2-A，再在 V2-A 通过后进入 V2-B。关联项目 `C:\skzy\QuickFileTransport\世界树计划` 的设计哲学是上位概念真源，本仓库不修改其源码。
+本仓库是 Project-Yggdrasil V2 的独立研究工作区。当前主线已经从旧 Stage A—AV-J-C 直接切换为 V2-A 推理介质、V2-B 静态多模态模型核、V2-C 多层多线程树图全双工智能体；严格按 A→B→C Gate 推进。关联项目 `C:\skzy\QuickFileTransport\世界树计划` 的设计哲学是上位概念真源，本仓库不修改其源码。
 
 ## 当前真源
 
 | 路径 | 地位与用途 |
 | --- | --- |
-| `docs/Project-Yggdrasil 多模态潜变量推理架构白皮书 V2.md` | 当前唯一目标架构规范；定义连续语义 recurrence、离散地址/控制 + 连续 payload 的合规混合 core 边界、Boundary-MoE、FFN-MoE 与审计。 |
-| `docs/Project-Yggdrasil V2 从架构验证到商用路线图.md` | 当前唯一高层路线；按 Gate 推进 R0、R1/R2/R3、架构完整版和商用路线。 |
-| `docs/next-stage-test-plan.md` | 当前最近执行真源；记录 V2-A/A1.5–A1.20C 的故障定位、A1.19H–A1.22A 高保真 R1 收敛路线、V2-B 顺序、证据口径、Gate、成本和旧路线收口。 |
-| `docs/v2-a-route-reassessment-2026-07-17.md` | A1.18B 后路线重审；定义合规混合 core，以及 A1.19H generalized hybrid core、A1.20B/A1.20C full-text boundary、A1.21P Pareto、A1.22A audit 的顺序与停机门。 |
+| `docs/Project-Yggdrasil 多模态潜变量推理架构白皮书 V2.md` | 当前唯一目标架构规范；定义连续语义 recurrence、离散地址/控制 + 连续 payload 的合规混合 core、静态 Boundary-MoE/FFN-MoE，以及 V2-C 系统级全双工 Boundary-MoE 与人类目标能力边界。 |
+| `docs/Project-Yggdrasil V2 从架构验证到商用路线图.md` | 当前唯一高层路线；按 Gate 推进 R0/R1、R2/R3 静态模型核、V2-C 架构完整版和商用路线；旧 A1-A4 后续路线已被直接替换。 |
+| `docs/next-stage-test-plan.md` | 当前最近执行真源；记录 V2-A/A1.5–A1.21P 的故障定位、V2-R1R 跨任务重验证、V2-B 静态模型核边界、V2-C 停止边界、证据口径、Gate 和成本。 |
+| `docs/v2-c-hierarchical-full-duplex-agent-experiment.md` | V2-C 统一系统实验合同；定义多层、多线程、责任树 + 受控图边、全双工消息、主动 Boundary、必要工具、人类目标连续性、Flat/同步基线、C0-C5 Gate 和停止规则；当前设计完成但未实施。 |
+| `docs/v2-a-route-reassessment-2026-07-17.md` | A1.18B 后路线重审；定义合规混合 core，以及 A1.19H generalized hybrid core、A1.20B/A1.20C full-text boundary、A1.21P Pareto、A1.22A audit 的顺序与停机门；2026-08-01 已同步 B→C 高层路线覆盖决定。 |
 | `docs/v2-a1.20b-full-text-boundary.md` | A1.20B 无 oracle full-text Boundary 合同、启动前吞吐优化、run-1 eligibility 失败、联合 mapping、oracle 替换、梯度信用审计与停线结论。 |
 | `docs/v2-a1.20c-boundary-repair.md` | A1.20C 分层 compiler × execution-credit 合同、token anchor、ST hard-forward、overfit32 失败、真实梯度冲突与停线结论。 |
+| `docs/v2-a1.20d-full-text-mechanism-repair.md` | A1.20C 后的 post-stop 双向 section 推断修复；记录 N5 截断根因、三遍 decode、完整 split/hidden causal/routing schedule 诊断与非 formal 边界。 |
+| `docs/v2-a1.21p-pareto.md` | K=1 容量负基线、在线 canonical/routing Pareto smoke、路径稳定性、六项正式缺口和 A1.22A 停机判定。 |
+| `docs/v2-r1-revalidation-task-design.md` | A1.21P 后的 R1 唯一实现级冻结设计；定义 ERE/CPS、统一 view、R1R-Latent v1、公平路径与 Gate；第 16 节覆盖 generator v1，冻结 P0-D v2 的去捷径、split、claim、tokenizer 与审计合同。 |
+| `docs/v2-r1r-p0-result.md` | V2-R1R generator v1 的 smoke/formal 机器结果、数据规模与失败重试证据；旧 10/10 已被主设计层否决，只是 rejected diagnostic。 |
+| `docs/v2-r1r-p0-main-review.md` | P0-D v1 主设计层独立复核；记录 ERE/CPS surface 满分捷径、claim/split/token/certificate 缺口及 v2 修订理由；当前 P0-D 路线判定真源之一，P0-M 禁止。 |
 | `docs/project-yggdrasil-latent-reasoning-architecture-review-2026-07-11.md` | V2 决策形成记录；只保存推导和审阅依据，不与白皮书并行定义规范。 |
 | `docs/moe-model-assembly-comparative-review-2026-07-14.md` | V2 的 Boundary-MoE/FFN-MoE 与公开模型路线的中文对照；区分已被其他模型验证的局部思想、完整架构未验证边界和 V2-B 未启动状态。 |
 | `docs/DIRECTORY_REFERENCE.md` | 本索引；新代码、测试、文档和归档必须同步这里。 |
-| `README.md` | 面向仓库使用者的当前状态说明；展示 A1.9 正证据、A1.10–A1.18B 根因/机制链和严格的未完成边界。 |
+| `README.md` | 面向仓库使用者的当前状态说明；展示 A1.19H/A1.20D 正证据、A1.21P 停止结论、V2-R1R P0-D v1 否决与 v2 重做边界、V2-C 仅设计状态。 |
 | `docs/v2-a-reasoning-medium-experiment.md` | V2-A 当前实现合同、Qwen3.5 基座、数据 schema、A0/A1/A2 结果、Gate 判定和失败边界。 |
 | `docs/v2-a1.5-latent-foundation.md` | A1.5 独立 schema、P0 结构化正控制、P1 Qwen hidden 接口、P2 learned-slot formal、因果干预和停止门禁。 |
 | `docs/v2-a1.9-qwen-boundary.md` | A1.9 冻结 Qwen hidden → 冻结 A1.8 structured core 的预注册合同、三 run formal/causal 结果、成本、捷径干预和证据边界。 |
@@ -36,15 +42,16 @@
 
 | 路径 | 用途与边界 |
 | --- | --- |
-| `docs/research-agent-literature-commands.md` | 面向 Google Gemini Deep Research 的三天研究冲刺命令；覆盖 A1.5 当前故障、V2-A3/A4、V2-B、I/O、工作树/记忆、专家晋升、完整架构和商用安全，并组织增量、反证与综合。研究报告只作为决策输入，不自动修改架构真源或 Gate。 |
+| `docs/research-agent-literature-commands.md` | 面向 Google Gemini Deep Research 的历史研究冲刺命令；其中旧 A1-A4 仅保留为专题分组，当前正式路线已将 I/O、工作树/记忆、专家晋升和整机评测聚合为 V2-C。研究报告只作为决策输入，不自动修改架构真源或 Gate。 |
+| `docs/thinking-draft-synthesis-2026-08-01.md` | 对 `thinking/` 五篇近期草稿的主题重建、逐命题判断和 V2-C 聚合映射，并把项目初期 V1 白皮书单列为历史参照；明确排除 `thinking/research/`，不修改原稿，也不自动升级为实验通过证据。 |
 
 ## 当前实现状态
 
-V2-A0 数据/基座链路、Qwen3.5-2B/0.8B text-CoT probe 和当前结构的 V2-A1 mechanism smoke 已实现；旧 A2 的 K/T、prompt、transition、读出、full-data、teacher/masked state supervision、token-wise source adapter、step-level verifier RL、latent-attention probe 与 0.8B/2B 对照仍未达到强 text-CoT 基线。source-layer bank、query init、token mixer、latent-attention 等失败入口已从当前代码删除。新增的 A1.5 独立 schema 与 P0/P1/P2 代码已完成：P0 32-example overfit final/state full exact `1.0/1.0`，4096-example best ordinary test `1.0/1.0`，composition-heldout `0.2734/0`，length-heldout final/state full exact `1.0/0.2266`；真实 Qwen3.5-2B FP16 hidden cache 已分片生成，P1 4096-cache formal ordinary validation final/state `1.0/1.0`，小 probe 仅作为 underfit 诊断；P2 K=8 formal ordinary test `1.0/1.0`、composition `0.2773/0`、length `1.0/0.6484`，same-answer composition shuffle 失败；A1.5 0.8B no-cap zero-shot 128 条 test/composition/length formal 分别为 `0.1797/0.0625/0.0234`、`0.4063/0.3828/0.3750`、`0.0625/0/0`，2-shot test/composition/length final/state 也分别为 `0.1328/0.0156`、`0.1953/0`、`0.0938/0`（格式解析率高但 state 失败）。A1.5 未通过，A3/A4/V2-B 均未启动。A1.5 真源见 `docs/v2-a1.5-latent-foundation.md` 与 `tmp/V2-A1.5 result.md`；旧 A2 结果仍只作历史 probe，不得与 A1.5 混写。
+V2-A0 数据/基座链路、Qwen3.5-2B/0.8B text-CoT probe 和当前结构的 V2-A1 mechanism smoke 已实现；旧 A2 的 K/T、prompt、transition、读出、full-data、teacher/masked state supervision、token-wise source adapter、step-level verifier RL、latent-attention probe 与 0.8B/2B 对照仍未达到强 text-CoT 基线。source-layer bank、query init、token mixer、latent-attention 等失败入口已从当前代码删除。新增的 A1.5 独立 schema 与 P0/P1/P2 代码已完成：P0 32-example overfit final/state full exact `1.0/1.0`，4096-example best ordinary test `1.0/1.0`，composition-heldout `0.2734/0`，length-heldout final/state full exact `1.0/0.2266`；真实 Qwen3.5-2B FP16 hidden cache 已分片生成，P1 4096-cache formal ordinary validation final/state `1.0/1.0`，小 probe 仅作为 underfit 诊断；P2 K=8 formal ordinary test `1.0/1.0`、composition `0.2773/0`、length `1.0/0.6484`，same-answer composition shuffle 失败；A1.5 0.8B no-cap zero-shot 128 条 test/composition/length formal 分别为 `0.1797/0.0625/0.0234`、`0.4063/0.3828/0.3750`、`0.0625/0/0`，2-shot test/composition/length final/state 也分别为 `0.1328/0.0156`、`0.1953/0`、`0.0938/0`（格式解析率高但 state 失败）。A1.5 未通过，V2-A3/V2-A4/V2-B 均未启动。A1.5 真源见 `docs/v2-a1.5-latent-foundation.md` 与 `tmp/V2-A1.5 result.md`；旧 A2 结果仍只作历史 probe，不得与 A1.5 混写。
 
 A1.6 已作为失败证据保留：data audit 与 overfit32 通过，正式 C0 ordinary/length trajectory full 为 `1.0/1.0`，relation-heldout 为 `0.765625`，按 Gate 停止。只读 checkpoint 诊断显示 oracle-reset one-step 与 predicted hard re-embed diagnostic 在 test/length/relation/causal 均为 `1.0`，失败定位为 continuous latent closure；旧 final-vs-trajectory Gate 无效，旧 relation split 也混入多变量。因果干预与 C1 未启动。
 
-A1.7 是当前结构化 core 证据：独立受控数据合同把唯一 holdout 冻结为 `COPY amber→jade`。三个初始化 seed 的 5–6 步 formal C0 与 causal intervention 均通过；目标 seed 的 test/length/relation trajectory full 为 `1.0/0.996094/0.998047`。但 2×2 消融表明短程通过不能只归因于地址/内容分离或 closure；closure 的明确作用是减缓长程漂移。三个目标 checkpoint 的 8/12/16 步严格压力 Gate 为 `0/3`，T16 supported 为 `0.894531/0.941406/0.894531`。当前对 V2-A 形成 matched text-CoT Pareto 的工程判断为 `40%–55%`、中心约 `48%`。该结论只覆盖三寄存器结构化合成 core；Qwen/C1、匿名 workspace、完整 V2-A、A3/A4/V2-B 均未启动。真源见 `docs/v2-a1.7-core.md`、`tmp/V2-A1.7 result.md` 与 `artifacts/v2-a/a1_7/core-assessment-summary.json`。
+A1.7 是当前结构化 core 证据：独立受控数据合同把唯一 holdout 冻结为 `COPY amber→jade`。三个初始化 seed 的 5–6 步 formal C0 与 causal intervention 均通过；目标 seed 的 test/length/relation trajectory full 为 `1.0/0.996094/0.998047`。但 2×2 消融表明短程通过不能只归因于地址/内容分离或 closure；closure 的明确作用是减缓长程漂移。三个目标 checkpoint 的 8/12/16 步严格压力 Gate 为 `0/3`，T16 supported 为 `0.894531/0.941406/0.894531`。当前对 V2-A 形成 matched text-CoT Pareto 的工程判断为 `40%–55%`、中心约 `48%`。该结论只覆盖三寄存器结构化合成 core；Qwen/C1、匿名 workspace、完整 V2-A、V2-A3/V2-A4/V2-B 均未启动。真源见 `docs/v2-a1.7-core.md`、`tmp/V2-A1.7 result.md` 与 `artifacts/v2-a/a1_7/core-assessment-summary.json`。
 
 A1.8 是当前最新 core 证据：保持 A1.7 架构和 closure 不变，把训练切换为 T1–16 batch 内均衡随机深度。三组独立 data/model seed 的 short、T8/12/16、OOD T20/T24、relation 和 causal Gate 全部通过；T16 supported/relation 最低为 `0.996094/1.0`，T24 为 `1.0/0.996094`，诊断性 T32 为 `0.988281/1.0`。跨 run 及相对 A1.7 fingerprints overlap 为 `0`。证据否定 T16 必然内在发散并支持 horizon mismatch，但没有 compute-matched 地拆分长度覆盖和 transition exposure；仍不覆盖 Qwen hidden、匿名 workspace 或 matched text-CoT Pareto。A1.8 完成时的工程概率为 V2-A Pareto `45%–60%`、中心约 `53%`。真源见 `docs/v2-a1.8-long-horizon.md`、`tmp/V2-A1.8 result.md` 与 `artifacts/v2-a/a1_8/assessment-summary.json`。
 
@@ -58,7 +65,32 @@ A1.12–A1.17 是当前最新二级根因证据。A1.12 BIND/CURSOR/BOTH 均为 
 
 A1.18/A1.18B 是当前最新训练机制证据。QAUX/FINAL-SAUX overfit32 通过；FINAL-SAUX paired formal/causal 为 `2/3`，证明 final-only 全局完整状态梯度方向正确但 seed 不稳定。TSAUX 用一组跨步共享训练头在每个递归步从 global workspace mean 预测完整 state；三个 paired seed 与三个 fresh model seed 的 formal/causal 均为 `3/3`。六个通过部署模型的 causal trajectory/answer 都为 `1.0`，全部反事实 Gate 通过，disable-recurrence 与 wrong-start trajectory 都为 `0`；formal 前辅助参数已物理删除。机器分类 `per_step_global_state_credit_assignment_confirmed`、`mechanism_solved=true`。结论只覆盖 exact-symbolic 三寄存器 core；逐步 oracle state target 的开放任务来源仍未解决。真源见 `docs/v2-a1.18-training-scaffold.md`、`tmp/V2-A1.18 result.md` 与 `artifacts/v2-a/a1_18b/assessment-summary.json`。
 
-2026-07-17 白皮书与路线重审已接受 `S_t=(A_t,H_t)` 合规混合 core：离散/prototype-anchored sidecar 只承载身份、地址、类型和控制，连续 `H_t` 承载语义推理。A1.19H-H1/H2 已完成 formal/causal `3/3`；训练 `N=2,3,4` 后 heldout `N=5` 与 `N=5+relation` 三 seed 全通过，机器分类 `generalized_hybrid_core_confirmed`。A1.20B 无 oracle learned full-text Boundary 在 heldout validation eligibility 失败后，A1.20C 加入 hierarchical entity/program compiler 与 straight-through execution credit。A1.20C 目标臂 anchors 和 answer 为 `1.0`，但 overfit32 trajectory/final-state 仅 `0.875/0.90625`；state-vs-local 全局梯度 cosine 为 `-0.7366`，机器分类 `anchor_localization_solved_but_execution_objectives_conflict`。完整 2×2、formal/causal、A1.21P、A1.22A 和 V2-B 均未启动；当前没有自动授权的下一阶段。
+2026-07-17 白皮书与路线重审已接受 `S_t=(A_t,H_t)` 合规混合 core：离散/prototype-anchored sidecar 只承载身份、地址、类型和控制，连续 `H_t` 承载语义推理。A1.19H-H1/H2 已完成 formal/causal `3/3`；A1.20D 又以三遍双向 section decode 形成 full-text mechanism 强诊断。A1.21P 因任务同构、baseline 不公平和 formal 证据缺失而停止，`a121p_passed=false`、`a122a_authorized=false`。2026-08-01 已由主设计层冻结 V2-R1R：A1.20D 只作正控制，以 ERE/CPS 检验同一 token-wise Boundary 与 shared recurrent core；训练使用可剥离的通用 claim verifier，不再使用任务专用 compiler 或显式寄存器。P0-D v1 package、正式数据与旧机器审计已完成，但旧 10/10 因 ERE/CPS 满分捷径、错误 claim、split 污染和审计缺口被主设计层否决；第 16 节 v2 修订已冻结。尚无有效 P0-D、Qwen hidden cache、Boundary/core、P0-M 或训练 artifact。V2-C 统一系统实验合同已完成并收口旧 A1-A4 远期路线，但必须继续等待 V2-A/V2-B。
+
+## V2-R1R P0-D 代码、测试与产物
+
+| 路径 | 内容 | 当前地位 |
+| --- | --- | --- |
+| `src/yggdrasil_v2/r1_revalidation/` | 独立 schema/view、nonce symbols、typed simulator、ERE/CPS generator、renderer 和 audit；当前内容是待 v2 修订的 generator v1，不含 model/cache/train。 | rejected P0-D v1 实现，不能训练 |
+| `experiments/v2_r1_revalidation.py` | v1 `generate-p0` / `audit-p0` CLI；正式输出默认拒绝覆盖。 | 待按第 16 节升级 v2 |
+| `tests/test_v2_r1r_data.py` | v1 simulator、causal pair、fingerprint、模板隔离、model view 和 token limit 测试。 | 旧测试通过但覆盖不足 |
+| `tests/test_v2_r1r_audit.py` | v1 overlap、unigram leakage 和 forbidden-field 审计测试。 | 旧测试通过但漏检关系型捷径 |
+| `docs/v2-r1r-p0-result.md` | v1 smoke/formal 机器结果、Gate 与停止判定。 | rejected diagnostic |
+| `docs/v2-r1r-p0-main-review.md` | v1 主设计层复核和 v2 修订依据。 | 当前复核结论 |
+| `artifacts/v2-r1r/p0-v1/` | v1 formal ERE/CPS JSONL、manifest、audit、heuristics 和 assessment。 | 旧机器 10/10；主设计层 rejected |
+
+## V2-R1R P0-D 运行产物
+
+| 路径 | 内容 | 当前地位 |
+| --- | --- | --- |
+| `artifacts/v2-r1r/p0-v1/data/ere/` | v1 ERE train、validation、OOD 与 causal pairs JSONL。 | rejected diagnostic；含 seed-literal 满分捷径 |
+| `artifacts/v2-r1r/p0-v1/data/cps/` | v1 CPS train、validation、OOD 与 causal pairs JSONL。 | rejected diagnostic；含 candidate 位置满分捷径 |
+| `artifacts/v2-r1r/p0-v1/manifest.json` | v1 generator/version/seed、旧设计 hash、环境、命令、时间和文件 SHA-256。 | v1 provenance 记录 |
+| `artifacts/v2-r1r/p0-v1/audit.json` | 旧十项 P0-D 机器审计明细。 | 自判通过但规格覆盖不足 |
+| `artifacts/v2-r1r/p0-v1/heuristics.json` | 旧 unigram、claim 数量和标签/选择平衡统计。 | 漏检结构化捷径与 claim 真值 |
+| `artifacts/v2-r1r/p0-v1/p0-assessment.json` | 旧 `passed` conjunction。 | 文件值 `true`，路线判定 rejected |
+| `artifacts/v2-r1r/p0-smoke-v1/` | 每族 64 train、32 validation/OOD 的 smoke 数据与审计。 | smoke，不是 formal |
+| `artifacts/v2-r1r/p0-v1-failed-*/` | 三次被保留的 formal 失败重试及其修复前证据。 | 诊断归档，不是最终结果 |
 
 ## 当前 V2-A 代码与测试
 
@@ -145,10 +177,13 @@ A1.18/A1.18B 是当前最新训练机制证据。QAUX/FINAL-SAUX overfit32 通�
 | `src/yggdrasil_v2/reasoning_medium/a1_20b_assessment.py` | overfit/cache/training/oracle/gradient evidence 的机器总判定与停线列表。 | `full_text_entity_binding_and_program_extraction_failure` |
 | `experiments/v2_a1_20b_full_text_boundary.py` | cache/audit/train/evaluate、diagnose、gradient-audit、assess-failure CLI。 | A1.20B 可复现失败入口；不得继续 run-2/run-3 |
 | `src/yggdrasil_v2/reasoning_medium/a1_20c_supervision.py` | 从 tokenizer offset 生成 entity name/value、operation family/source/target、query 的训练专用 token anchor target，并审计 target 不进入 forward。 | A1.20C compiler supervision；overfit/run-1 audit 通过 |
-| `src/yggdrasil_v2/reasoning_medium/a1_20c_model.py` | flat/hierarchical compiler × hard-local/ST wrapper；hierarchical entity table、ordered operation reader、hard-forward soft-backward frozen-core bridge。 | A1.20C 目标结构实现；目标臂 overfit Gate 失败 |
-| `src/yggdrasil_v2/reasoning_medium/a1_20c_train.py` | anchor + mapping + state loss、overfit/formal eligibility、hard-forward equivalence、core hash 与 checkpoint。 | fixed-5000 目标臂已完成；不得进入 matrix/formal |
-| `src/yggdrasil_v2/reasoning_medium/a1_20c_diagnostics.py` | 对实际 checkpoint 计算 state-vs-local 参数梯度夹角、失败 cell、late regression 与停线分类。 | `anchor_localization_solved_but_execution_objectives_conflict` |
-| `experiments/v2_a1_20c_boundary_repair.py` | prepare/audit supervision、2×2 arm train 与 diagnose-overfit CLI。 | A1.20C 可复现失败入口；后续臂按 Gate 未运行 |
+| `src/yggdrasil_v2/reasoning_medium/a1_20c_model.py` | flat/hierarchical/factorized compiler、shared entity/operation Viterbi、三遍双向 section decode 与 frozen-core bridge。 | A1.20C 历史失败实现 + A1.20D post-stop 机制修复 |
+| `src/yggdrasil_v2/reasoning_medium/a1_20c_train.py` | anchor + mapping + state loss、分离 reader/schedule seed、优化 scope、formal eligibility、hard-forward equivalence、core hash 与 checkpoint。 | A1.20D 路径稳定性可复现训练基础；当前非 fresh formal |
+| `src/yggdrasil_v2/reasoning_medium/a1_20c_diagnostics.py` | 对实际 checkpoint 计算 state-vs-local 梯度夹角、失败 cell、tail loss 与 section 诊断。 | A1.20C 失败归因和 A1.20D 根因搜索辅助 |
+| `experiments/v2_a1_20c_boundary_repair.py` | prepare/audit、训练、schedule seed、优化 scope 与诊断 CLI。 | A1.20C/A1.20D 可复现入口 |
+| `src/yggdrasil_v2/reasoning_medium/a1_21p_k1.py` | 单 slot anonymous recurrent reasoner 的训练、formal evaluator 与完整性报告。 | A1.21P 容量负基线；validation trajectory `0.106934` |
+| `src/yggdrasil_v2/reasoning_medium/a1_21p_pareto.py` | routing surface data、section/capacity 诊断、跨域 probe、official-chat 在线 direct/text-CoT/hybrid preflight 与正式 assessment。 | A1.20D/A1.21P 机器评估入口；`a121p_passed=false` |
+| `experiments/v2_a1_21p_pareto.py` | prepare/probe/K1/preflight/assess 统一 CLI。 | 当前 A1.21P 可复现入口；A1.22A 未授权 |
 | `src/yggdrasil_v2/reasoning_medium/a1_5_p1.py` | Qwen3.5-2B FP16 hidden cache、operation span token mask、P1 hidden-to-latent interface。 | A1.5 P1 mechanism/surrogate probe |
 | `src/yggdrasil_v2/reasoning_medium/a1_5_p1_train.py` | P1 hidden cache training、start/query/operation warm-up、state/final CE、best reload 和多 split 诊断。 | A1.5 P1 surrogate formal；ordinary validation 通过 |
 | `src/yggdrasil_v2/reasoning_medium/a1_5_p2.py` | K=8 learned multi-slot workspace、共享 transition、无答案旁路和 permutation probe。 | A1.5 P2 formal core；composition 失败 |
@@ -176,7 +211,8 @@ A1.18/A1.18B 是当前最新训练机制证据。QAUX/FINAL-SAUX overfit32 通�
 | `tests/test_v2_a1_18_training_scaffold.py` | QAUX 初始化等同、SAUX/TSAUX shape/gradient、query-coupled answer、训练期限定、物理部署剥离和 A1.18B 分类。 | A1.18/A1.18B 完整性单元测试 |
 | `tests/test_v2_a1_19h_hybrid_core.py` | opaque-handle/slot 等变、辅助剥离、H2 N5 合同、缓存编码等价、冻结 loss 与缓存期严格地址校验。 | A1.19H 完整性与训练优化回归测试 |
 | `tests/test_v2_a1_20b_full_text_boundary.py` | continuous-payload core 等价、Boundary 无 oracle mask/role 输入、冻结 core 梯度隔离、N/T sampler、oracle 诊断选择与 hard-control state-credit 断裂。 | A1.20B 架构/训练/归因合同测试 |
-| `tests/test_v2_a1_20c_boundary_repair.py` | token anchor 角色、flat-hard 等价、hierarchical no-oracle forward、ST hard-forward 等价与 state gradient 恢复。 | A1.20C 4 项回归测试通过 |
+| `tests/test_v2_a1_20c_boundary_repair.py` | token anchor、flat/hierarchical/factorized no-oracle forward、shared Viterbi、三遍 section decode、ST/state-credit 与训练 schedule 合同。 | A1.20C/A1.20D 回归测试通过 |
+| `tests/test_v2_a1_21p_pareto.py` | trace parser、official prompt、routing 语义保持、Pareto dominance、K1 容量/梯度和 formal assessment 停机合同。 | A1.21P 8 项回归测试通过 |
 | `tests/conftest.py` | 为当前 CPU torchvision wheel 预声明缺失的 NMS operator，保证 Transformers 测试收集可重复；不改变模型运行语义。 | 测试环境隔离 |
 
 本地 `artifacts/v2-a/` 被 `.gitignore` 忽略；阶段结果路径、配置和证据等级必须以对应阶段文档与本目录索引为准，不把未索引的本地文件当作 repo truth。
@@ -332,6 +368,22 @@ A1.18/A1.18B 是当前最新训练机制证据。QAUX/FINAL-SAUX overfit32 通�
 | `docs/v2-a1.20c-boundary-repair.md` | 2×2 合同、实现、overfit、梯度冲突、Gate 与下一修复边界。 | A1.20C 人类可读正式记录 |
 | `tmp/V2-A1.20C result.md` | 已完成/未完成项与停线交接。 | 当前阶段结果交接 |
 
+## A1.20D/A1.21P 运行产物
+
+| 路径 | 内容 | 当前地位 |
+| --- | --- | --- |
+| `artifacts/v2-a/a1_21p/routing-{inrange,n5}-entity-capacity-threshold.json` | N4 伪第五实体与 N5 真第五实体在粗/refined section boundary 下的 pair-gain 扫描。 | A1.20D 根因证据 |
+| `artifacts/v2-a/a1_21p/joint-shared-family-canonical-formal-bidirectional-probe.json` | 同一 checkpoint 的 canonical 八 split 完整矩阵。 | 全部诊断 Gate 通过；源 artifact `formal_gate=false` |
+| `artifacts/v2-a/a1_21p/joint-shared-family-canonical-hidden-causal-audit.json` | normal、zero hidden、batch roll、token reverse 与 core integrity。 | hidden causal Gate 通过 |
+| `artifacts/v2-a/a1_21p/joint-shared-family-routing-ood-{bidirectional-probe,seed2,seed3}.json` | 三个 continuation schedule 的 routing OOD/N5 probes。 | 路径稳定性 `3/3`；非 fresh model/data seed |
+| `artifacts/v2-a/a1_21p/k1/full-probe/results.json` | K=1 2048 validation 容量基线。 | trajectory/final/answer `0.106934/0.333008/0.550293` |
+| `artifacts/v2-a/a1_21p/p{0-current,1-routing}-family-chat-smoke5.json` | official chat template 下 direct/text-CoT/hybrid 在线五条 Pareto smoke。 | candidate 正证据；非正式样本规模 |
+| `artifacts/v2-a/a1_21p/routing-data-v2-ood-small/manifest.json` | routing 数据来源、split 和语义变换声明。 | `surface_only_transform=true`；不得作为新代数 |
+| `artifacts/v2-a/a1_21p/assessment-summary.json` | 机制门、正式门、来源 SHA-256、完成/缺失项与停机判定。 | `a121p_passed=false`；`a122a_authorized=false` |
+| `docs/v2-a1.20d-full-text-mechanism-repair.md` | 三遍双向 section 修复、结果、架构解释和证据边界。 | A1.20D 人类可读记录 |
+| `docs/v2-a1.21p-pareto.md` | K1、在线 smoke、六项正式缺口和下一轮合同。 | A1.21P 人类可读正式记录 |
+| `tmp/V2-A1.20D-A1.21P result.md` | 完成/未完成项与 A1.22A 停机交接。 | 当前阶段结果交接 |
+
 ## A1.5 运行产物
 
 | 路径 | 内容 | 当前地位 |
@@ -362,6 +414,7 @@ A1.18/A1.18B 是当前最新训练机制证据。QAUX/FINAL-SAUX overfit32 通�
 | `note.txt` | 用户笔记；按要求保留，不删除。 |
 | `下一件事.txt` | 用户待办笔记；保留。 |
 | `HF token.txt` | 用户本地文件；保留，不在文档中展开其内容。 |
+| `thinking/`（不含 `thinking/research/`） | 被 `.gitignore` 排除的用户原始思考稿；五篇近期草稿只读并保留原文，`Project-Yggdrasil 未来多模态潜空间智能体架构.md` 作为项目初期 V1 历史参照；正式整理见 `docs/thinking-draft-synthesis-2026-08-01.md`。 |
 | `.gitignore` | 本地环境、缓存和未来实验产物的忽略规则。 |
 
 ## 旧路线归档
@@ -383,4 +436,4 @@ A1.18/A1.18B 是当前最新训练机制证据。QAUX/FINAL-SAUX overfit32 通�
 
 ## 维护规则
 
-新增 V2 文件应先归入明确的 V2-A/V2-B 语义包，再更新本索引。实验结果只能在 evidence level、配置、seed、heldout、消融、成本和失败边界齐全后进入当前证据；旧 Stage 结果不得静默升级为 V2 架构证据。任何再次废弃的当前文件都移动到带日期的 `archive/`，不保留并列旧入口。
+新增 V2 文件应先归入明确的 V2-A/V2-B/V2-C 语义包，再更新本索引。实验结果只能在 evidence level、配置、seed、heldout、消融、成本和失败边界齐全后进入当前证据；旧 Stage 结果不得静默升级为 V2 架构证据。V2-C C0-C4 只提供系统组件归因，不能单独冒充 C5 `integrated-system`。任何再次废弃的当前文件都移动到带日期的 `archive/`，不保留并列旧入口。

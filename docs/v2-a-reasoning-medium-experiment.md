@@ -1,7 +1,7 @@
 # V2-A：推理介质实验
 
 日期：2026-07-13  
-当前判定：A0 visible text-CoT 已形成正向 probe；当前结构的 A1 mechanism smoke 已通过；A2 的 2B K8/T8 MLP full-data latent probe 将普通 test 提到 `0.6016`，但 composition-heldout 只有 `0.3672`，仍没有相对 text-CoT 的稳定 heldout Pareto。新的 token-wise source adapter 只把 composition 提到 `0.4063`（bottleneck=128），test 为 `0.5859`，仍未形成 Pareto；Attention + Dense FFN 形式的 latent-attention full512 probe 为 `0.5078/0.4141/0.4531`（test/composition/length），no-latent 与 shuffled-latent 均为 `0.0938`；同构 0.8B latent probe 的 test 为 `0.2578`。逐步 verifier self-critical RL full512 probe 为 `0.5625/0.3906/0.5547`，verifier test 寄存器准确率仅 `0.0968`、整态命中为 `0`，策略熵塌缩。随后新增的 A1.5 分层正控制证明 P0/P2 ordinary 可执行、P1 ordinary hidden→latent 可拟合，但 P0/P1/P2 的 composition-heldout 分别只有 `0.2734`、`0.3242`、`0.2773` final，state full 仍为 `0` 或 `0.3290`；A1.5 Gate 仍未通过。未启动 A3/A4 或 V2-B。
+当前判定：A0 visible text-CoT 已形成正向 probe；当前结构的 A1 mechanism smoke 已通过；A2 的 2B K8/T8 MLP full-data latent probe 将普通 test 提到 `0.6016`，但 composition-heldout 只有 `0.3672`，仍没有相对 text-CoT 的稳定 heldout Pareto。新的 token-wise source adapter 只把 composition 提到 `0.4063`（bottleneck=128），test 为 `0.5859`，仍未形成 Pareto；Attention + Dense FFN 形式的 latent-attention full512 probe 为 `0.5078/0.4141/0.4531`（test/composition/length），no-latent 与 shuffled-latent 均为 `0.0938`；同构 0.8B latent probe 的 test 为 `0.2578`。逐步 verifier self-critical RL full512 probe 为 `0.5625/0.3906/0.5547`，verifier test 寄存器准确率仅 `0.0968`、整态命中为 `0`，策略熵塌缩。随后新增的 A1.5 分层正控制证明 P0/P2 ordinary 可执行、P1 ordinary hidden→latent 可拟合，但 P0/P1/P2 的 composition-heldout 分别只有 `0.2734`、`0.3242`、`0.2773` final，state full 仍为 `0` 或 `0.3290`；A1.5 Gate 仍未通过。未启动 V2-A3/V2-A4 或 V2-B。
 
 本文件记录当前 V2-A 的实现合同、可复现实验入口和证据边界。架构规范以 [`Project-Yggdrasil 多模态潜变量推理架构白皮书 V2.md`](Project-Yggdrasil%20多模态潜变量推理架构白皮书%20V2.md) 为准，阶段顺序和 Gate 以 [`next-stage-test-plan.md`](next-stage-test-plan.md) 为准。
 
@@ -241,7 +241,7 @@ A1.5 不沿用旧 v4 数据或旧 A2 的 K/T 结论，而是以独立 schema `yg
 
 这一轮的稳定结果是：P0 结构化正控制在 ordinary test final/state `1.0/1.0`，但 composition `0.2734/0`、length `1.0/0.2266`；P1 Qwen3.5-2B 4096-cache warm-up/joint surrogate 在 ordinary validation/test final/state `1.0/1.0`，composition final/state `0.3242/0.3290`；P2 K=8 learned workspace ordinary test `1.0/1.0`，composition `0.2773/0`，length `1.0/0.6484`。P2 的 same-answer composition shuffle accuracy `0.2773`、changed prediction rate `0.8125`，说明样本身份依赖仍在。用户要求的 Qwen3.5-0.8B no-cap visible baseline 已提供独立入口；test/composition/length zero-shot 各128条的 parse/final/state 分别为 `0.1797/0.0625/0.0234`、`0.4063/0.3828/0.3750`、`0.0625/0/0`，2-shot final/state 分别为 `0.1328/0.0156`、`0.1953/0`、`0.0938/0`。未终态 completion 用显式 wall-time safety timeout 记录，不用隐藏 `max_new_tokens`，因此其批量矩阵不能与 latent 结果混为质量结论。
 
-A1.5 的问题定位比旧 A2 更清楚：recurrent transition 本身可运行，失败集中在 operation relation binding、未见 bigram 的组合泛化、length 上的答案/state 脱钩、hidden→latent 组合信息保真和 visible baseline 的终止/显存边界。Gate 仍未通过，A3/A4/V2-B 继续停止。
+A1.5 的问题定位比旧 A2 更清楚：recurrent transition 本身可运行，失败集中在 operation relation binding、未见 bigram 的组合泛化、length 上的答案/state 脱钩、hidden→latent 组合信息保真和 visible baseline 的终止/显存边界。Gate 仍未通过，V2-A3/V2-A4/V2-B 继续停止。
 
 ## 6. Gate 判定、担忧与下一步
 
@@ -249,7 +249,7 @@ A1.5 的问题定位比旧 A2 更清楚：recurrent transition 本身可运行�
 
 1. A0 数据、基座、解析、prompt contract、无总输出长度限制和成本记录链已落地；2B visible text-CoT 是正向强基线，0.8B 当前 smoke 可跑但质量和可解析率更弱，不能替换 2B。
 2. A1 当前实现的机制、checkpoint/resume、no-bypass 和干预 smoke 已通过，但 smoke 质量为零不能升级成任务学习证据。
-3. A2 已覆盖 K/T、prompt、初始化、copied/MLP transition、latent-attention probe、mean/flatten readout、source reread、full-data、masked state/query-state supervision、step-level verifier RL 以及 0.8B/2B 基座对照；2B K8 full-data latent test `0.6016` 仍低于 2B text-CoT `1.0`，且 composition-heldout 没有同步改善；masked state probe 为 `0.5703/0.3984/0.4219`，verifier-RL probe 为 `0.5625/0.3906/0.5547`，状态 verifier 未学会；0.8B latent test `0.2578` 也低于其 text-CoT `0.75`。Gate A2 未通过，不能进入 A3 audit 或 A4 formal，更不能启动 V2-B。
+3. A2 已覆盖 K/T、prompt、初始化、copied/MLP transition、latent-attention probe、mean/flatten readout、source reread、full-data、masked state/query-state supervision、step-level verifier RL 以及 0.8B/2B 基座对照；2B K8 full-data latent test `0.6016` 仍低于 2B text-CoT `1.0`，且 composition-heldout 没有同步改善；masked state probe 为 `0.5703/0.3984/0.4219`，verifier-RL probe 为 `0.5625/0.3906/0.5547`，状态 verifier 未学会；0.8B latent test `0.2578` 也低于其 text-CoT `0.75`。Gate A2 未通过，不能进入 V2-A3 audit 或 V2-A4 formal，更不能启动 V2-B。
 
 主要担忧不是输出长度，而是冻结基座的 token-level 状态信息在 latent cross-attention 前后的表示几何与监督目标不匹配。旧 verifier smoke 的 padding 奖励 shortcut 已被 v5 有效步骤 mask 清除；正式 RL probe 随后出现熵塌缩和近零 verifier 泛化。source adapter 的 composition 改善说明逐 token 适配可能是正确方向，但当前 test 没有同步超过 baseline，且没有多 seed；继续堆 `K/T`、训练步数或辅助 loss 不能替代 adapter 正则化/状态保真目标的正式设计。在新的 encoder/latent 接口形成稳定正向证据前，不扩展到 audit 或多模态。
 

@@ -1,12 +1,12 @@
 # 下一阶段测试任务规划
 
-日期：2026-07-17
+日期：2026-08-01
 
 架构真源：`docs/Project-Yggdrasil 多模态潜变量推理架构白皮书 V2.md`
 
 总路线：`docs/Project-Yggdrasil V2 从架构验证到商用路线图.md`
 
-当前状态：V2-A0 数据/基座链路、2B text-CoT probe 和当前结构的 V2-A1 mechanism smoke 已实现；旧 A2 probe 未形成稳定 Pareto。A1.8 使结构化 core 通过 T24，A1.9 证明 oracle-role-segmented Qwen hidden 可驱动该 frozen core。A1.10–A1.17 把 exact-symbolic Reasoner 的失败定位到 relation-addressed transition、soft closure 与训练目标悖论。A1.18/A1.18B 解决诊断 core 的逐步全局状态信用分配，A1.19H 又把固定三寄存器推广为 equality-only opaque handles + variable-cardinality continuous payload，formal/causal `3/3`。A1.20B 的无 oracle full-text Boundary 在 heldout validation 失败后，A1.20C 加入分层 entity/program compiler 与 straight-through execution credit。A1.20C 的训练 token anchors、hard-forward equivalence 和 answer 均通过，但目标臂 overfit32 trajectory/final-state 只有 `0.875/0.90625`；state 与 local compiler objective 的全局梯度 cosine 为 `-0.7366`。完整 2×2、formal/causal、A1.21P、A1.22A 与 V2-B 均未启动，V2-A 当前不通过。
+当前状态：A1.19H 已为 mixed latent core 形成 formal/causal `3/3`，A1.20D 又修复 full-text Boundary 的双向 section 一致性并形成强诊断正证据；但这些结果仍集中在 COPY/SWAP 状态机切面。A1.21P 因任务同构、prompt-only baseline 对监督 hybrid 不公平、样本与 fresh-seed/cost 证据不足而正式停止，`a121p_passed=false`、`a122a_authorized=false`。2026-07-29 已终止继续完善该切面的默认路线；2026-08-01 已由主设计层冻结 V2-R1R 的 ERE/CPS 生成算法、统一 model view、R1R-Latent v1、claim verifier 监督、公平 SFT、因果与成本 Gate。P0-D generator v1 与旧机器审计虽已完成并自判 10/10，但主设计层发现 ERE/CPS 满分结构化捷径、CPS claim 错标、split 污染和审计缺口，已正式否决。当前停止在 P0-D v2 修复，尚未启动 P0-M、模型或训练。V2-A 当前不通过。V2-C 系统实验合同只有设计地位，不构成越过 V2-A/V2-B 的实施许可。
 
 ## 1. 路线直接切换
 
@@ -15,9 +15,10 @@
 旧 Stage A—AV-J-C 保留为代理实验历史，最高只能提供 mechanism/surrogate 证据。新的当前主线从 V2-A 开始：
 
 1. **V2-A：推理介质。**比较显式文本思维链、单向量 latent recurrence 和多向量 latent recurrence。
-2. **V2-B：多模态与双层 MoE。**使用 V2-A 胜出介质，验证 Boundary-MoE、FFN-MoE 和文本/视觉/动作融合。
+2. **V2-B：静态多模态模型核。**使用 V2-A 胜出介质，验证固定输入/输出下的 Boundary-MoE、FFN-MoE、Attention Pump 和文本/视觉/动作表示。
+3. **V2-C：多层、多线程、树图混合全双工智能体。**把主动 Boundary、真实工具、工作树/记忆、人类目标连续性和隔离专家演化放在一个系统合同中验证。
 
-在 V2-A 正式通过前，不实现 V2-B；在 V2-B 通过前，不加入工作树运行层、长期记忆、主动采样、渐进生成或离线专家晋升。
+在 V2-A 正式通过前，不实现 V2-B；在 V2-B 正式通过前，不实现 V2-C。V2-C 的任务、协议、基线和 Gate 可以预先设计，但不得借此接入真实工具、启动系统训练或宣称整机能力。
 
 ## 2. 共同证据口径
 
@@ -175,7 +176,7 @@ A1.5 是在旧 A2 之后新增的分层正控制，不继续旧 K/T sweep。它�
 - P1 已真实生成 Qwen3.5-2B FP16、分片、无静默截断的 hidden cache；small probe 仅为 underfit 诊断，4096-cache warm-up/joint formal ordinary validation final/state `1.0/1.0`，并支持 best checkpoint reload 与五 split `p1-evaluate`；
 - A1.5 matched text-CoT 入口已支持 Qwen3.5-0.8B/2B、zero-shot/2-shot 和无人工总输出 cap；0.8B test/composition/length zero-shot 各128条 formal 分别为 parse/final/state `0.1797/0.0625/0.0234`、`0.4063/0.3828/0.3750`、`0.0625/0/0`，2-shot test/composition/length final/state `0.1328/0.0156`、`0.1953/0`、`0.0938/0`，test zero-shot 有10条 safety timeout。批量 runner 增加透明 per-example wall-time safety timeout，但512条扩展矩阵仍未完成；
 - P2 learned K=8 slots 已完成 formal 训练与干预：ordinary 通过，composition 与 same-answer shuffle 失败，length state full 仅 `0.6484`；
-- A1.5 未通过，A3 audit、A4 formal 和 V2-B 均保持停止。
+- A1.5 未通过，V2-A3 audit、V2-A4 formal 和 V2-B 均保持停止。
 
 详细记录、命令和 artifacts：`docs/v2-a1.5-latent-foundation.md`、`tmp/V2-A1.5 result.md`、`artifacts/v2-a/a1_5/`。下一轮优先修正 operation-composition binding、same-answer identity dependence 与 length state fidelity；P1 ordinary interface 已建立，不返回旧 A2 的 K/T sweep。
 
@@ -307,7 +308,35 @@ A1.20C 复用 A1.20B 的 frozen full-token Qwen cache、frozen A1.19H-H2 core、
 
 因此另外三个 2×2 正式训练臂、heldout validation matrix、三 seed formal/causal、A1.21P 与 A1.22A 均未运行。继续前必须新立项把 entity-count/pointer-validity 联合连续化，分阶段或投影冲突梯度，并引入 joint-stage 学习率衰减；然后从 fresh initialization 重过 overfit32。不能把 anchor 或 answer `1.0` 当作机制通过。完整记录见 `docs/v2-a1.20c-boundary-repair.md`、`tmp/V2-A1.20C result.md` 与 `artifacts/v2-a/a1_20c/overfit32/hierarchical__straight_through/failure-diagnostic.json`。
 
-## 4. V2-B：多模态与双层 MoE
+### 3.17 V2-A1.20D：双向 section 推断（放宽机制修复，通过）
+
+A1.20D 是 A1.20C 严格失败后的 post-stop diagnostic，不追溯改写旧 Gate。容量阈值扫描显示，旧粗 operation boundary 下 N4 伪第五实体和 N5 真实第五实体不可由一个全局 pair-gain threshold 分开；但使用 refined first-operation position 后，两组 gain 分别约为 `5–8` 与 `13–18`，原阈值 `12` 已可分。根因是旧 factorized forward 执行“粗 operation → entity → refined operation”后，没有把 refined program start 反馈给最终 entity decode。
+
+实现改为三遍“粗 operation → entity → refined operation → final entity”。不新增 oracle span、typed role 或 hard re-embedding，不改变 frozen Qwen、frozen A1.19H core 和 hard deployment path。原 joint checkpoint 无需重训：canonical 八 split 诊断矩阵全部通过，N5/N5+relation trajectory/final/answer 全为 `1.0`；normal hidden trajectory 为 `1.0`，zero/batch-roll/token-reverse 为 `0/0.001953/0`。routing 四个 OOD split 在三个 continuation schedule 上都通过，最低 trajectory 为 N5 的 `0.96875`。
+
+该结果将 A1.20C 的部分负梯度冲突重新解释为错误 section 因果图的结果，证明 full-text hybrid mechanism 是强候选。但 canonical artifact 明确为 `formal_gate=false`，三个 schedule 共享 reader/core/data 起点，不能写成 fresh-seed formal。完整记录见 `docs/v2-a1.20d-full-text-mechanism-repair.md`。
+
+### 3.18 V2-A1.21P：matched Pareto（已停止，正式失败）
+
+已完成 K=1 recurrent 容量负基线、canonical/routing 在线五条 Pareto smoke、三 schedule 路径稳定性和机器总判定。K=1 在 2048 条 validation 的 trajectory/final-state/state-token/answer 为 `0.106934/0.333008/0.497406/0.550293`。在线 smoke 包含 Qwen encode：canonical direct/text-CoT/hybrid answer 为 `0/0.4/1.0`、median latency 为 `0.586/45.235/0.489` 秒；routing 表面域为 `0/0/1.0`、`1.540/47.438/1.567` 秒。
+
+这些结果只确认 candidate。正式 Gate 失败六项：joint细粒度 eligibility 为 `0/3`；每个 family 只有五条在线样本；routing manifest 明确 `surface_only_transform=true`，不是第二种可执行代数；三个 continuation 不是 fresh model/data seeds；没有 matched training/teacher-data budget artifact；没有 FLOPs、activation/KV 与 teacher 全成本 artifact。direct/text-CoT 仅 deterministic prompting，而 hybrid 已训练，routing text-CoT 还复用 canonical demonstrations。
+
+机器分类 `full_text_hybrid_candidate_confirmed_but_matched_pareto_not_closed`，`a121p_passed=false`、`a122a_authorized=false`。按硬顺序停止，不运行 A1.22A。重新启动 A1.21P 前必须设计真正改变可执行代数或规划结构的新任务族，补齐三组 fresh data/reader/core seeds、公平 baseline 训练合同、每 family 至少 64 条在线评估和完整成本账本。完整记录见 `docs/v2-a1.21p-pareto.md`、`tmp/V2-A1.20D-A1.21P result.md` 与 `artifacts/v2-a/a1_21p/assessment-summary.json`。
+
+### 3.19 V2-R1R：最小跨任务重验证（v2 修订已冻结，P0-D v1 被否决）
+
+当前不再继续完善 COPY/SWAP compiler，也不直接重跑旧 A1.21P。A1.20D 保留为机制正控制；新的 R1R 使用同一共享 Boundary/core 联合验证两个不同任务族：`ERE` 情境规则执行负责单轨长程状态更新，`CPS` 约束计划选择负责并行候选模拟、条件、资源、延迟后果与成本比较。每个 episode 临时定义 nonce 规则/action 语义，禁止固定 operation 枚举和任务专用 transition。
+
+冻结模型为 `Qwen3.5-2B final hidden -> token-wise 2048→512 Boundary -> K=1/8 shared two-layer recurrent core -> latent-only 9-label readout`。Boundary 不做 section/entity/candidate compiler；core 按公开序列长度使用 `T=min(24,L+2)`，两个任务共享全部参数。训练期用共享 claim verifier 从 `H_t` 判断 simulator 生成的真假状态命题，最后 600 update 退火为 answer-only 并物理删除 probe。AST、span、role、entity/candidate state、正确索引和答案都不得进入 model view。
+
+P0-D 先以每族 4096/512 完成 simulator、fingerprint、必要因果、hard-negative、heuristic、claim 和禁止字段审计；旧“CoT 必须比 direct 高 0.15”不再作为数据 Gate，因为模型输出策略不是数据属性，该差值移到 P1 实测。P0-D 后只运行 overfit/吞吐 smoke；全部通过才用新的 8192/1024 数据训练 direct SFT、text-CoT SFT、K=1 latent、K=8 latent。P1 同时要求行为、OOD、causal pair、latent intervention、T 截断、aux 剥离和 bypass Gate；P2 每族至少 128 条在线 matched Pareto；P3 才运行三个 fresh generator/Boundary/core seed。
+
+若 ERE 通过而 CPS 失败，则只证明状态执行器；若两者可运行但没有 Pareto，则终止 V2 多模态主线；若 K=1 支配 K=8，则删除多 slot 复杂度。完整生成算法、张量结构、loss schedule、CLI、成本和停止规则见 `docs/v2-r1-revalidation-task-design.md`，执行 agent 不得自行修改。
+
+P0-D v1 于 2026-08-01 生成每族 train 4096、validation 512、五个规定 OOD/causal split 各 512，旧审计器自判十项为 `true`；主设计层复核随后证明该 conjunction 漏掉关系型位置捷径与监督真值，故当前判定为失败。旧结果见 `docs/v2-r1r-p0-result.md` 和 `artifacts/v2-r1r/p0-v1/`，只保留作 rejected diagnostic。第 16 节已冻结 generator v2、真实 Qwen tokenizer、candidate/action 随机化、ERE 多事件必要性、composition/language 独立性、claim truth 与结构化 heuristic 等 13 项新 conjunction。本轮仍未启动 P0-M、Qwen hidden cache、Boundary/core 或任何 GPU 训练。
+
+## 4. V2-B：静态多模态与双层 MoE
 
 V2-B 只有在 V2-A 通过后启动。
 
@@ -352,26 +381,24 @@ FFN-MoE 从 4 experts、top-1 和约 1.25 capacity factor 起步。Boundary rout
 
 Gate：组合相对各单项产生多 seed 可重复净收益；若只增加总参数而没有 active-compute 或质量收益，回退 Dense。
 
-### 4.5 V2-B4：文本 + 视觉 + 动作
+### 4.5 V2-B4：静态文本 + 视觉 + 动作表示
 
-- 加入动作状态、动作候选和动作输出专家；
-- 使用 READ/REASON/AUDIT/EMIT/STOP；
-- 输出先显式选择单专家；
+- 固定输入中加入动作状态和动作候选，固定输出使用单一动作或文本专家；
 - 检查动作合法性、视觉事实、文本约束和审计一致性；
-- 任一单模态不能独立解决任务。
+- 任一单模态不能独立解决任务；
+- 只验证动作语义表示与静态路由，不执行真实动作，不允许模型主动 READ/EMIT，不引入超时恢复、工作树或人类目标保持。
 
-### 4.6 V2-B5：教师调用到自主调用
+Gate：相对同预算统一多模态模型/早期拼接，Boundary-MoE + 胜出 core 在多 seed 上形成可重复质量或 active-compute 净收益；no/shuffled modality、router 干预和固定专家对照形成因果证据。若收益只来自更多总参数，或静态动作合法性不成立，则 V2-B 停止，不进入 V2-C。
 
-1. 静态输入；
-2. 教师指定 READ/EMIT；
-3. 删除调用标签后自主调用；
-4. 加入无效调用、空结果、冲突、超时和精读成本。
+## 5. V2-C：多层、多线程、树图混合全双工智能体
 
-Gate：同质量下降低总读取成本，且能从错误调用恢复。该阶段通过后，路线进入总路线图 R3/A1。
+V2-C 只有在 V2-A 与 V2-B 正式通过后启动。完整合同见 [`v2-c-hierarchical-full-duplex-agent-experiment.md`](v2-c-hierarchical-full-duplex-agent-experiment.md)。它不是把高保真 I/O、工作树、异步节点、专家晋升和人类目标拆成数轮松散实验，而是围绕一个系统问题组织：同基座、同工具、同环境和同预算下，多层、多线程、树图混合的全双工 Boundary-MoE 智能体，能否相对 Flat 与同步层级基线同时改善目标忠实度、异步任务质量、延迟、恢复和成本。
 
-## 5. 当前不执行的内容
+内部按 C0 协议审计、C1 同步正控制、C2 多线程全双工、C3 树图与主动 Boundary、C4 离线能力演化、C5 整机 formal 推进。C0-C4 只负责构建和因果归因；只有 C5 两类正式任务通过，才能声明 `integrated-system`。人类主权、权限、取消和不可逆动作审批在所有阶段都是代码硬约束；理解、保持、分解、修订和停止人类目标，才是 V2-C 的被测行为能力。
 
-以下内容已经进入 V2 和总路线，但不属于最近实现：
+## 6. 当前不执行的内容
+
+以下内容已经聚合进 V2-C，但在 V2-A/V2-B 通过前只有设计地位，不属于最近实现：
 
 - 多输出专家候选 arbiter；
 - 图像/视频/音频高保真生成与编辑；
@@ -381,7 +408,7 @@ Gate：同质量下降低总读取成本，且能从错误调用恢复。该阶�
 - 渐进生成和动态资源预算；
 - 商用 serving、数据治理、SLO、计费和客户试点。
 
-## 6. 旧路线收口
+## 7. 旧路线收口
 
 以下路线不再继续：
 
@@ -392,10 +419,12 @@ Gate：同质量下降低总读取成本，且能从错误调用恢复。该阶�
 - Attention Pump 唯一通道；
 - 内部宪法自评后直接固化生产权重；
 - 工作树 drop 等同 KV 无损回收。
+- 把主动调用、真实工具和人类目标能力提前塞进 V2-B；
+- 把高保真 I/O、工作树、异步节点、专家晋升和整机评测继续拆成旧 A1-A4 并行路线。
 
 旧脚本、测试、报告和 artifact 只保留历史证据地位。后续若实施 V2，应删除或重写锁定旧契约的代码和测试，不建立兼容 wrapper。
 
-## 7. 最近执行顺序
+## 8. 最近执行顺序
 
 1. 已完成 V2-A0 基座候选筛选、canonical 任务选择、数据 schema 和可复现数据生成；
 2. Qwen3.5-2B 普通/组合 heldout text-CoT probe 已形成正向信号，length-heldout 仍有错误；
@@ -415,11 +444,15 @@ Gate：同质量下降低总读取成本，且能从错误调用恢复。该阶�
 16. A1.18B TSAUX 已完成三个 paired 与三个 fresh seed：两组 formal/causal 都为 `3/3`，部署辅助头全部删除，机制 Gate 通过；
 17. A1.19H generalized hybrid core 已完成：H1/H2 overfit32、三 seed formal 与 formal 后 causal 均通过，heldout N5 与 N5+relation 三 seed 全通过，机器分类 `generalized_hybrid_core_confirmed`；
 18. A1.20B learned full-text boundary 已完成 run-1 并在 formal 前 eligibility 失败；
-19. A1.20C 分层 compiler × straight-through 修复已完成监督审计、实现、smoke、目标臂 fixed-5000 overfit32 与实际 checkpoint 梯度审计；目标臂 strict Gate 失败，完整 2×2、formal/causal、A1.21P、A1.22A 和 V2-B0 均保持停止。当前没有自动授权的下一阶段，继续前必须先修复 entity-count/pointer-validity 信用和 state-vs-local 负梯度冲突。
+19. A1.20C 分层 compiler × straight-through 修复已完成监督审计、实现、smoke、目标臂 fixed-5000 overfit32 与实际 checkpoint 梯度审计；目标臂 strict Gate 失败；
+20. A1.20D post-stop 机制修复已完成：双向三遍 section decode 修复 N5 截断，canonical 完整 split matrix、hidden causal 与三个 routing schedule probe 均通过放宽机制门，但不是 fresh-seed formal；
+21. A1.21P 已完成 K=1 负基线、两个在线五条 smoke、路径稳定性和机器 assessment；六项正式合同缺口使 `a121p_passed=false`，A1.22A 与 V2-B0 保持停止。
+22. 已完成 V2-R1R 主设计层冻结和 P0-D v1 独立 package；旧机器 10/10 已因结构化捷径、错误 claim 和 split/audit 缺口被主设计层否决。v2 修订合同已冻结，当前仍未实现或运行 Qwen hidden Boundary、共享 latent core、四条公平 baseline、P0-M/P1/P2/P3 和成本账本，路线停在 P0-D 重做。
+23. 已完成 V2-C 统一系统实验设计：旧 A1-A4 目标已聚合为 C0-C5；当前没有运行时、工具接入、数据、代码、训练或 formal artifact，且不改变 V2-R1R 的当前优先级。
 
-当前已有 A1.8 structured core 到 T24、A1.9 oracle-role-segmented frozen Qwen hidden boundary、A1.10–A1.17 分层失败归因、A1.18B TSAUX 训练机制闭环，以及 A1.19H generalized hybrid core 的多 seed formal/causal artifact。最新证据证明 equality-only opaque addressing + shared continuous transition + closure + per-step global complete-state credit assignment 可以稳定跨实体数量学习 exact-symbolic state，且正式输出不需要答案旁路。A1.20C 又证明 hierarchical token-role localization 可以在 full-text overfit32 学到全 exact，straight-through 也能保持 hard forward 并恢复执行级梯度；但未受约束的 state/local objective 会在 entity count、pointer validity 和 shared reader 上产生强负梯度冲突。learned full-text Boundary、matched Pareto 与完整 V2-A formal artifact 仍不存在。不得把 A1.19H symbolic core Gate 或 A1.20C answer/anchor `1.0` 写成完整 V2-A 通过。
+当前已有 A1.8 structured core 到 T24、A1.9 oracle-role-segmented frozen Qwen hidden boundary、A1.10–A1.17 分层失败归因、A1.18B TSAUX 训练机制闭环，以及 A1.19H generalized hybrid core 的多 seed formal/causal artifact。A1.20D 又证明 full-text entity/program compiler 必须双向闭合 section boundary；修复后 canonical N5、长程、relation 与 hidden causal 均形成强诊断正证据，说明当前 hybrid mechanism 已值得继续。可是 learned full-text Boundary 的三组 fresh formal、matched Pareto 与完整 V2-A formal artifact 仍不存在。不得把 A1.20D 单起点诊断、routing 表面改写或五条在线 smoke 写成 A1.21P/V2-A 通过。
 
-## 8. 担忧与不确定性
+## 9. 担忧与不确定性
 
 1. 成熟文本基座可能无法在本机 8GB 显存上按理想配置训练；应优先冻结、缓存 hidden states、使用小型 latent reasoner，而不是退回 from-scratch 代理模型冒充目标架构。
 2. 复制顶部 block 形成 recurrent reasoner 是参考实现，不保证最优；R1 失败时应与共享层或独立 reasoner 对照。
@@ -431,7 +464,7 @@ Gate：同质量下降低总读取成本，且能从错误调用恢复。该阶�
 8. 当前 2B text-CoT 在普通 test 与 composition-heldout probe 为正向强基线；修正后的 2B K8/T8 full-data MLP latent 为 `0.6016/0.3672/0.5078`（test/composition/length），K8/T4 为 `0.5234/0.3672/0.4063`，K16/T8 为 `0.5078/0.4063/0.3906`，source adapter bottleneck=128 为 `0.5859/0.4063/0.5078`，K8/T2/T16 也未形成 Pareto；0.8B 同构 latent test 为 `0.2578`。仍没有多 seed 稳定性和 Pareto 优势，不能把训练 loss、teacher/state 辅助 loss、adapter 的单项 heldout 增益或单次准确率包装成 A2 通过。
 9. 将 text-CoT 的 2 个 trace demonstrations 注入 encoder 的 probe 反而降至 test 0.0625，说明 demonstrations 不是当前 latent 的稳健修复，后续不能把它当作默认输入合同。
 10. Qwen3.5 原生 thinking 的单样本探针在 206 token 后未形成可解析终态；native thinking 不能被当作 A0 visible CoT 的替代 Gate。
-11. token-wise source adapter 在 bottleneck=128 的两个 seed 中把 composition-heldout 提升到 `0.4063/0.4609`，但普通 test 为 `0.5859/0.5078`、length 为 `0.5078/0.4766`，没有同时超过 K8/T8 baseline `0.6016/0.3672/0.5078`。bottleneck=512 的普通 test 为 `0.5469`。该方向只能作为下一轮信息保真/正则化设计的候选，不能直接进入 A3。
+11. token-wise source adapter 在 bottleneck=128 的两个 seed 中把 composition-heldout 提升到 `0.4063/0.4609`，但普通 test 为 `0.5859/0.5078`、length 为 `0.5078/0.4766`，没有同时超过 K8/T8 baseline `0.6016/0.3672/0.5078`。bottleneck=512 的普通 test 为 `0.5469`。该方向只能作为下一轮信息保真/正则化设计的候选，不能直接进入 V2-C 能力演化。
 12. 将前三个 latent slot 绑定到 amber/cobalt/jade 的 register-slot supervision full512 probe 为 `0.5859/0.3750/0.5078`，没有把 adapter 的 composition 增益转化为答案泛化；过程监督仍不能替代正式 verifier/reward 设计。
 13. 首次 step-level verifier self-critical RL full512 probe 使用 v5 有效步骤 mask，结果为 `0.5625/0.3906/0.5547`，test greedy register accuracy `0.0968`、state/final exact 均为 `0`，末尾 policy entropy 约 `0.0017`。RL 已进入反传但发生策略塌缩，不能把 reward loss 或 sampled/greedy reward 当成状态学习证据；后续若重做，必须先解决 reward 信号稀疏和 policy collapse。
 14. 为符合白皮书的 Attention + Dense FFN 参考结构，曾加入 identity-initialized latent-attention transition；full512 的 test/composition/length 为 `0.5078/0.4141/0.4531`，no-latent 与 shuffled-latent 都为 `0.0938`。它没有形成因果递归或 Pareto 优势，当前代码与 CLI 已删除，不保留并列旧入口。
@@ -442,7 +475,11 @@ Gate：同质量下降低总读取成本，且能从错误调用恢复。该阶�
 19. A1.11 Boundary 的 hard re-embedding 是只读诊断，不是被验证的新架构；若未来使用 prototype-anchored/discrete addressing，必须直接切换合同并重新做 fresh formal，不能把诊断偷偷变成兼容补丁。
 20. 当前 TSAUX 使用每步完整三寄存器 oracle state。它解决结构化 core 的训练机制，不解决开放任务的 target 来源；但白皮书不要求零 teacher 训练。后续允许 executable/verifier-filtered teacher target，必须报告成本、覆盖和错误率，并禁止部署/推理时 teacher 绕过。
 21. 纯匿名 `K-slot` 与全连续寻址都不再被当作必须坚持的核心承诺。当前候选 core 是 `S_t=(A_t,H_t)` relation-addressable hybrid workspace；离散 sidecar 只能承载身份、地址、类型和控制，不能承载答案或完整语义 state。
-22. A1.19H 已通过，但只形成 hybrid core 证据。完整 R1 仍必须在 full-text、同基座、计算匹配条件下形成 Pareto，并训练自然语言 audit readout 通过因果忠实性 Gate；不得用 symbolic trajectory 指标代替 A3/A4。
+22. A1.19H 已通过，但只形成 hybrid core 证据。完整 R1 仍必须在 full-text、同基座、计算匹配条件下形成 Pareto，并训练自然语言 audit readout 通过因果忠实性 Gate；不得用 symbolic trajectory 指标代替 V2-A formal，更不得提前宣称 V2-C 系统能力。
 23. A1.19H-H2 的旧训练路径存在严重 CPU/GPU 同步浪费。后续 A1.20B–A1.22A 的 cached training 必须在正式启动前做 tensor cache、热路径同步、固定 shape 和吞吐基准审计；GPU 功率不是单独 Gate，step/s、端到端延迟和数值等价才是主指标。
 24. A1.20B 已按上述要求在正式训练前完成 Qwen cache batch benchmark、mmap cached training 与同步/prefetch 对照。低功率的剩余部分来自约 `2.77M` 参数 Boundary、batch 16 和周期性全 validation，而不是逐样本 Qwen 编码。更关键的失败是 threshold/argmax 控制切断 state CE：局部 mapping CE 在 train batch 可接近零，但 heldout 完整程序联合 exact 只有 `0.087891`。下一轮必须先解决执行级离散信用分配和分层 entity/program binding，不能用更高 GPU 利用率替代机制修复。
 25. A1.20C 已把 overfit32 训练推进到约 `4.24 step/s`，GPU 在热路径可达到高利用率；性能不再是本轮失败主因。真正残留的是 pointer-validity 的 hard mask 断点和实际负梯度冲突：state-vs-local 全局 cosine `-0.7366`、presence heads `-0.9944`。下一修复必须改变训练接口和优化顺序，不能只延长固定 `3e-4` 训练。
+26. A1.20D 证明上述冲突至少部分来自错误的单向 section 因果图；修复后旧 checkpoint 已可通过强诊断矩阵。因此下一次正式训练应先保持双向 section decode，再判断是否仍需 gradient projection 或 loss schedule。
+27. A1.21P 当前最危险的假阳性来自 baseline 不公平与任务同构：五条 smoke、canonical demonstrations 和 COPY/SWAP 表面改写都可能夸大 hybrid 优势。下一轮不得只增加 routing 样本，必须先建立新可执行代数和 matched training/teacher 合同。
+28. R1R 不要求模型从 final loss 自行发明地址、mask、预算或信用分配；这些由代码或训练脚手架提供。禁止的不是工程结构，而是推理时 oracle/答案旁路和在模型内硬编码任务语义。
+29. R1R 的目标是最小充分证伪，不是把一个切面做到 `1.0`。内部 trajectory exact 降为诊断，正式结论看跨任务行为、因果、最差 seed 和 matched 质量—成本。

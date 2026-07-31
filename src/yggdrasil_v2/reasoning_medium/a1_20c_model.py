@@ -20,6 +20,16 @@ from .a1_20b_model import (
 
 COMPILERS = ("flat", "hierarchical", "factorized")
 CREDIT_MODES = ("hard_local", "straight_through")
+IDENTITY_WINDOW_START = 1
+IDENTITY_WINDOW_TOKENS = 11
+ENTITY_PAIR_GAIN_THRESHOLD = 12.0
+OPERATION_SUPPORTED_GAIN_THRESHOLD = 19.0
+OPERATION_RECURRENT_GAIN_THRESHOLD = 10.5
+OPERATION_CROSSING_GAIN_THRESHOLD = (
+    OPERATION_SUPPORTED_GAIN_THRESHOLD
+    + OPERATION_RECURRENT_GAIN_THRESHOLD
+) / 2.0
+OPERATION_POTENTIAL_VOTERS = 16
 
 
 @dataclass(frozen=True)
@@ -80,30 +90,452 @@ def _masked_anchor_values(
     return logits, context
 
 
+def _anchor_window_context(
+    logits: torch.Tensor,
+    values: torch.Tensor,
+    source_mask: torch.Tensor,
+    *,
+    start_offset: int = 0,
+    width: int,
+) -> torch.Tensor:
+    return _anchor_window_tokens(
+        logits,
+        values,
+        source_mask,
+        start_offset=start_offset,
+        width=width,
+    ).mean(dim=-2)
+
+
+def _anchor_window_tokens(
+    logits: torch.Tensor,
+    values: torch.Tensor,
+    source_mask: torch.Tensor,
+    *,
+    start_offset: int = 0,
+    width: int,
+) -> torch.Tensor:
+    if start_offset < 0 or width < 1:
+        raise ValueError("identity window offsets must be non-negative")
+    return _anchor_window_tokens_from_probabilities(
+        logits.softmax(dim=-1),
+        values,
+        source_mask,
+        start_offset=start_offset,
+        width=width,
+    )
+
+
+def _anchor_window_tokens_from_probabilities(
+    probabilities: torch.Tensor,
+    values: torch.Tensor,
+    source_mask: torch.Tensor,
+    *,
+    start_offset: int = 0,
+    width: int,
+) -> torch.Tensor:
+    if start_offset < 0 or width < 1:
+        raise ValueError("identity window offsets must be non-negative")
+    sequence = values.shape[1]
+    stop = min(start_offset + width, sequence)
+    contexts: list[torch.Tensor] = []
+    for offset in range(start_offset, stop):
+        shifted_values = values.new_zeros(values.shape)
+        shifted_values[:, : sequence - offset] = values[:, offset:]
+        shifted_valid = source_mask.new_zeros(source_mask.shape)
+        shifted_valid[:, : sequence - offset] = source_mask[:, offset:]
+        weights = probabilities * shifted_valid.unsqueeze(1).to(
+            dtype=probabilities.dtype
+        )
+        context = torch.einsum(
+            "bqs,bsd->bqd", weights, shifted_values
+        )
+        context = context / weights.sum(dim=-1).clamp_min(
+            torch.finfo(context.dtype).eps
+        ).unsqueeze(-1)
+        contexts.append(context)
+    return torch.stack(contexts, dim=-2)
+
+
+def _aligned_window_pointer_logits(
+    queries: torch.Tensor,
+    entities: torch.Tensor,
+    query_projection: nn.Linear,
+    entity_projection: nn.Linear,
+    scale: float,
+) -> torch.Tensor:
+    """Compare identity tokens at equal offsets without pooling away order."""
+    if queries.shape[-2:] != entities.shape[-2:]:
+        raise ValueError("query/entity identity windows must have equal shape")
+    query = nn.functional.normalize(
+        query_projection(queries), dim=-1
+    )
+    entity = nn.functional.normalize(
+        entity_projection(entities), dim=-1
+    )
+    aligned = torch.einsum("bqwd,bewd->bqew", query, entity)
+    return aligned.mean(dim=-1) * scale
+
+
+def _operation_count_from_gains(
+    triple_gains: torch.Tensor,
+    *,
+    supported_gain_threshold: float,
+    recurrent_gain_threshold: float,
+    potential_voters: int,
+) -> torch.Tensor:
+    """Apply a high-confidence crossing gate, then recurrent continuation."""
+    if triple_gains.ndim != 2:
+        raise ValueError("operation triple gains must be [B,O-1]")
+    increment_index = torch.arange(
+        triple_gains.shape[1], device=triple_gains.device
+    )
+    supported_end = max(0, potential_voters - 1)
+    crossing_threshold = (
+        supported_gain_threshold + recurrent_gain_threshold
+    ) / 2.0
+    gain_thresholds = torch.where(
+        increment_index < supported_end,
+        triple_gains.new_full((), supported_gain_threshold),
+        triple_gains.new_full((), recurrent_gain_threshold),
+    )
+    gain_thresholds = torch.where(
+        increment_index == supported_end,
+        triple_gains.new_full((), crossing_threshold),
+        gain_thresholds,
+    )
+    supported_increment = (
+        triple_gains > gain_thresholds.unsqueeze(0)
+    ).long().cumprod(dim=-1)
+    return 1 + supported_increment.sum(dim=-1)
+
+
+def _shared_operation_viterbi_decode(
+    logits: torch.Tensor,
+    query_position: torch.Tensor,
+    *,
+    minimum_position: torch.Tensor | None = None,
+    triple_gain_threshold: float = OPERATION_SUPPORTED_GAIN_THRESHOLD,
+    recurrent_gain_threshold: float = OPERATION_RECURRENT_GAIN_THRESHOLD,
+    potential_voters: int = OPERATION_POTENTIAL_VOTERS,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Decode repeated family/source/target records from shared potentials.
+
+    Operation slots are recurrent addresses, not distinct semantic roles.
+    Their learned anchor logits therefore vote for one generic three-role
+    grammar.  The query anchor closes the operation segment, while incremental
+    Viterbi path score determines how many complete triples are present.
+    Straight-through hard probabilities keep training gradients without
+    changing the discrete deployment path.
+    """
+    if logits.ndim != 4 or logits.shape[2] != 3:
+        raise ValueError("operation anchor logits must be [B,O,3,S]")
+    batch, operations, roles, sequence = logits.shape
+    if query_position.shape != (batch,):
+        raise ValueError("query position batch mismatch")
+    if minimum_position is not None and minimum_position.shape != (batch,):
+        raise ValueError("operation minimum position batch mismatch")
+    if sequence < roles:
+        raise ValueError("operation decode requires at least three tokens")
+    if potential_voters < 1:
+        raise ValueError("operation potential voters must be positive")
+
+    # Only positively supervised readers may vote for the generic role
+    # potential.  Queries 16--31 are recurrent capacity for OOD execution, not
+    # separately trained semantic roles; including them in a max creates
+    # arbitrary long-context peaks.
+    supported_voters = min(operations, potential_voters)
+    shared_logits = logits[:, :supported_voters].max(dim=1).values
+    source_position = torch.arange(sequence, device=logits.device)
+    query_boundary = query_position.clamp(min=roles, max=sequence)
+    before_query = (
+        source_position.unsqueeze(0) < query_boundary.unsqueeze(-1)
+    )
+    in_operation_section = before_query
+    if minimum_position is not None:
+        latest_valid_start = (query_boundary - roles).clamp_min(0)
+        lower_boundary = torch.minimum(
+            minimum_position.clamp(min=0, max=sequence - 1),
+            latest_valid_start,
+        )
+        in_operation_section = in_operation_section & (
+            source_position.unsqueeze(0) >= lower_boundary.unsqueeze(-1)
+        )
+    shared_logits = shared_logits.masked_fill(
+        ~in_operation_section.unsqueeze(1), -torch.inf
+    )
+    repeated_logits = shared_logits.unsqueeze(1).expand(
+        -1, operations, -1, -1
+    ).reshape(batch, operations * roles, sequence)
+
+    dynamic = repeated_logits[:, 0]
+    dynamic_rows = [dynamic]
+    backpointers: list[torch.Tensor] = []
+    triple_scores: list[torch.Tensor] = []
+    for step in range(1, operations * roles):
+        prefix_score, prefix_index = torch.cummax(dynamic, dim=-1)
+        previous_score = torch.cat(
+            (
+                dynamic.new_full((batch, 1), -torch.inf),
+                prefix_score[:, :-1],
+            ),
+            dim=-1,
+        )
+        previous_index = torch.cat(
+            (
+                prefix_index.new_full((batch, 1), -1),
+                prefix_index[:, :-1],
+            ),
+            dim=-1,
+        )
+        dynamic = repeated_logits[:, step] + previous_score
+        dynamic_rows.append(dynamic)
+        backpointers.append(previous_index)
+        if step % roles == roles - 1:
+            triple_scores.append(dynamic.max(dim=-1).values)
+
+    first_triple_score = dynamic_rows[roles - 1].max(dim=-1).values
+    stacked_triple_scores = torch.stack(
+        (first_triple_score, *triple_scores[1:]), dim=1
+    )
+    triple_gains = (
+        stacked_triple_scores[:, 1:] - stacked_triple_scores[:, :-1]
+    )
+    # Inside the directly supervised horizon use its high
+    # validation-calibrated threshold.  Crossing the horizon uses the midpoint
+    # between supported and recurrent regimes; only after that proof do later
+    # records use the validation background ceiling.  Shared max-potential
+    # magnitude attenuates outside supervised positions, while true/background
+    # ordering remains intact.
+    operation_count = _operation_count_from_gains(
+        triple_gains,
+        supported_gain_threshold=triple_gain_threshold,
+        recurrent_gain_threshold=recurrent_gain_threshold,
+        potential_voters=potential_voters,
+    )
+    path_lengths = operation_count * roles
+    stacked_dynamic = torch.stack(dynamic_rows, dim=1)
+    terminal_scores = stacked_dynamic[
+        torch.arange(batch, device=logits.device),
+        path_lengths - 1,
+    ]
+    current = terminal_scores.argmax(dim=-1)
+    selected_positions = logits.argmax(dim=-1).reshape(
+        batch, operations * roles
+    )
+    for step in range(operations * roles - 1, -1, -1):
+        active = step < path_lengths
+        selected_positions[:, step] = torch.where(
+            active, current, selected_positions[:, step]
+        )
+        if step:
+            previous = backpointers[step - 1].gather(
+                1, current.unsqueeze(-1)
+            ).squeeze(-1)
+            current = torch.where(active, previous, current)
+
+    selected_positions = selected_positions.reshape(
+        batch, operations, roles
+    )
+    raw_probabilities = logits.softmax(dim=-1)
+    shared_probabilities = shared_logits.softmax(dim=-1)
+    repeated_probabilities = shared_probabilities.unsqueeze(1).expand(
+        -1, operations, -1, -1
+    )
+    hard_probabilities = nn.functional.one_hot(
+        selected_positions, num_classes=sequence
+    ).to(dtype=repeated_probabilities.dtype)
+    straight_through = (
+        hard_probabilities
+        + repeated_probabilities
+        - repeated_probabilities.detach()
+    )
+    operation_mask = (
+        torch.arange(operations, device=logits.device)
+        .unsqueeze(0)
+        .lt(operation_count.unsqueeze(-1))
+    )
+    decoded_probabilities = torch.where(
+        operation_mask.unsqueeze(-1).unsqueeze(-1),
+        straight_through,
+        raw_probabilities,
+    )
+    return (
+        decoded_probabilities,
+        selected_positions,
+        operation_mask,
+        triple_gains,
+    )
+
+
+def _shared_entity_viterbi_decode(
+    entity_name_logits: torch.Tensor,
+    entity_value_logits: torch.Tensor,
+    first_operation_position: torch.Tensor,
+    *,
+    pair_gain_threshold: float = ENTITY_PAIR_GAIN_THRESHOLD,
+) -> tuple[
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+]:
+    """Decode an ordered entity table from shared learned potentials.
+
+    The capacity-final query is excluded from the potential pool because the
+    N2--N4 training contract never gives it a positive anchor target.  The
+    supported queries vote for generic name/value positions; a single
+    alternating Viterbi path then extrapolates to the capacity-final entity.
+    """
+    if entity_name_logits.shape != entity_value_logits.shape:
+        raise ValueError("entity name/value logits must have equal shape")
+    if entity_name_logits.ndim != 3:
+        raise ValueError("entity anchor logits must be [B,E,S]")
+    batch, entities, sequence = entity_name_logits.shape
+    if entities < 2:
+        raise ValueError("shared entity decode requires capacity >= 2")
+    if first_operation_position.shape != (batch,):
+        raise ValueError("first operation position batch mismatch")
+    if sequence < 2:
+        raise ValueError("entity decode requires at least two tokens")
+
+    supported = entities - 1
+    shared_name = entity_name_logits[:, :supported].max(dim=1).values
+    shared_value = entity_value_logits[:, :supported].max(dim=1).values
+    source_position = torch.arange(
+        sequence, device=entity_name_logits.device
+    )
+    operation_boundary = first_operation_position.clamp(
+        min=2, max=sequence
+    )
+    before_operations = (
+        source_position.unsqueeze(0)
+        < operation_boundary.unsqueeze(-1)
+    )
+    shared_name = shared_name.masked_fill(
+        ~before_operations, -torch.inf
+    )
+    shared_value = shared_value.masked_fill(
+        ~before_operations, -torch.inf
+    )
+    alternating = torch.stack(
+        (shared_name, shared_value), dim=1
+    ).repeat(1, entities, 1)
+
+    dynamic = alternating[:, 0]
+    dynamic_rows = [dynamic]
+    backpointers: list[torch.Tensor] = []
+    pair_scores: list[torch.Tensor] = []
+    for step in range(1, entities * 2):
+        prefix_score, prefix_index = torch.cummax(dynamic, dim=-1)
+        previous_score = torch.cat(
+            (
+                dynamic.new_full((batch, 1), -torch.inf),
+                prefix_score[:, :-1],
+            ),
+            dim=-1,
+        )
+        previous_index = torch.cat(
+            (
+                prefix_index.new_full((batch, 1), -1),
+                prefix_index[:, :-1],
+            ),
+            dim=-1,
+        )
+        dynamic = alternating[:, step] + previous_score
+        dynamic_rows.append(dynamic)
+        backpointers.append(previous_index)
+        if step % 2:
+            pair_scores.append(dynamic.max(dim=-1).values)
+
+    stacked_pair_scores = torch.stack(pair_scores, dim=1)
+    pair_gains = (
+        stacked_pair_scores[:, 1:] - stacked_pair_scores[:, :-1]
+    )
+    supported_increment = (
+        pair_gains > pair_gain_threshold
+    ).long().cumprod(dim=-1)
+    entity_count = 1 + supported_increment.sum(dim=-1)
+    path_lengths = entity_count * 2
+
+    stacked_dynamic = torch.stack(dynamic_rows, dim=1)
+    terminal_scores = stacked_dynamic[
+        torch.arange(batch, device=entity_name_logits.device),
+        path_lengths - 1,
+    ]
+    current = terminal_scores.argmax(dim=-1)
+    raw_positions = torch.stack(
+        (
+            entity_name_logits.argmax(dim=-1),
+            entity_value_logits.argmax(dim=-1),
+        ),
+        dim=2,
+    ).reshape(batch, entities * 2)
+    selected_positions = raw_positions.clone()
+    for step in range(entities * 2 - 1, -1, -1):
+        active = step < path_lengths
+        selected_positions[:, step] = torch.where(
+            active, current, selected_positions[:, step]
+        )
+        if step:
+            previous = backpointers[step - 1].gather(
+                1, current.unsqueeze(-1)
+            ).squeeze(-1)
+            current = torch.where(active, previous, current)
+
+    selected_positions = selected_positions.reshape(
+        batch, entities, 2
+    )
+    raw_probabilities = torch.stack(
+        (
+            entity_name_logits.softmax(dim=-1),
+            entity_value_logits.softmax(dim=-1),
+        ),
+        dim=2,
+    )
+    shared_probabilities = torch.stack(
+        (
+            shared_name.softmax(dim=-1),
+            shared_value.softmax(dim=-1),
+        ),
+        dim=1,
+    ).unsqueeze(1).expand(-1, entities, -1, -1)
+    hard_probabilities = nn.functional.one_hot(
+        selected_positions, num_classes=sequence
+    ).to(dtype=shared_probabilities.dtype)
+    straight_through = (
+        hard_probabilities
+        + shared_probabilities
+        - shared_probabilities.detach()
+    )
+    entity_mask = (
+        torch.arange(entities, device=entity_name_logits.device)
+        .unsqueeze(0)
+        .lt(entity_count.unsqueeze(-1))
+    )
+    decoded_probabilities = torch.where(
+        entity_mask.unsqueeze(-1).unsqueeze(-1),
+        straight_through,
+        raw_probabilities,
+    )
+    return (
+        decoded_probabilities[:, :, 0],
+        decoded_probabilities[:, :, 1],
+        selected_positions[:, :, 0],
+        selected_positions[:, :, 1],
+        entity_mask,
+        pair_gains,
+    )
+
+
 def _prefix_mask(logits: torch.Tensor, minimum: int) -> torch.Tensor:
     count = (logits > 0).sum(dim=-1).clamp(
         min=minimum, max=logits.shape[-1]
     )
     positions = torch.arange(logits.shape[-1], device=logits.device)
     return positions.unsqueeze(0) < count.unsqueeze(-1)
-
-
-def _categorical_prefix(
-    count_logits: torch.Tensor,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    probabilities = count_logits.softmax(dim=-1)
-    capacity = count_logits.shape[-1]
-    slot = torch.arange(capacity, device=count_logits.device)
-    hard_count = count_logits.argmax(dim=-1) + 1
-    hard_mask = slot.unsqueeze(0) < hard_count.unsqueeze(-1)
-    survival = torch.stack(
-        [probabilities[:, index:].sum(dim=-1) for index in range(capacity)],
-        dim=-1,
-    )
-    epsilon = torch.finfo(survival.dtype).eps
-    survival = survival.clamp(min=epsilon, max=1.0 - epsilon)
-    presence_logits = torch.log(survival) - torch.log1p(-survival)
-    return presence_logits, hard_mask
 
 
 def _hard_core_forward(
@@ -531,8 +963,6 @@ class A120DFactorizedCompiler(nn.Module):
         self.family_norm = nn.LayerNorm(d)
         self.operation_identity_norm = nn.LayerNorm(d)
         self.query_identity_norm = nn.LayerNorm(d)
-        self.entity_count_head = nn.Linear(d, config.maximum_entities)
-        self.operation_presence_head = nn.Linear(d, 1)
         self.value_head = nn.Linear(d, core.config.value_classes)
         self.payload_head = nn.Linear(d, d)
         nn.init.zeros_(self.payload_head.weight)
@@ -586,7 +1016,7 @@ class A120DFactorizedCompiler(nn.Module):
             entity_queries = block(
                 entity_queries, reader_source, ~mask
             )
-        entity_name_logits, entity_name_context = _masked_anchor_values(
+        entity_name_logits, _ = _masked_anchor_values(
             entity_queries,
             reader_source,
             semantic_source,
@@ -595,7 +1025,7 @@ class A120DFactorizedCompiler(nn.Module):
             self.anchor_source,
             self.config.anchor_scale,
         )
-        entity_value_logits, entity_value_context = _masked_anchor_values(
+        entity_value_logits, _ = _masked_anchor_values(
             entity_queries,
             reader_source,
             semantic_source,
@@ -604,13 +1034,6 @@ class A120DFactorizedCompiler(nn.Module):
             self.anchor_source,
             self.config.anchor_scale,
         )
-        entity_identities = self.entity_identity_norm(
-            entity_name_context
-        )
-        entity_payload_latents = self.entity_payload_norm(
-            entity_queries + entity_value_context
-        )
-
         operation_positions = _sinusoidal_positions(
             self.config.maximum_operations, d, reader_source
         )
@@ -631,9 +1054,8 @@ class A120DFactorizedCompiler(nn.Module):
             batch, self.config.maximum_operations, 3, d
         )
         role_logits: list[torch.Tensor] = []
-        role_contexts: list[torch.Tensor] = []
         for role in range(3):
-            logits, context = _masked_anchor_values(
+            logits, _ = _masked_anchor_values(
                 operation_queries[:, :, role],
                 reader_source,
                 semantic_source,
@@ -643,25 +1065,14 @@ class A120DFactorizedCompiler(nn.Module):
                 self.config.anchor_scale,
             )
             role_logits.append(logits)
-            role_contexts.append(context)
         operation_anchor_logits = torch.stack(role_logits, dim=2)
-        operation_contexts = torch.stack(role_contexts, dim=2)
-        family_latents = self.family_norm(
-            operation_queries[:, :, 0] + operation_contexts[:, :, 0]
-        )
-        source_identities = self.operation_identity_norm(
-            operation_contexts[:, :, 1]
-        )
-        target_identities = self.operation_identity_norm(
-            operation_contexts[:, :, 2]
-        )
 
         query = self.query_role_query.view(1, 1, d).expand(
             batch, -1, -1
         )
         for block in self.query_reader:
             query = block(query, reader_source, ~mask)
-        query_anchor_logits, query_context = _masked_anchor_values(
+        query_anchor_logits, _ = _masked_anchor_values(
             query,
             reader_source,
             semantic_source,
@@ -670,46 +1081,184 @@ class A120DFactorizedCompiler(nn.Module):
             self.anchor_source,
             self.config.anchor_scale,
         )
-        query_identity = self.query_identity_norm(
-            query_context
-        ).squeeze(1)
+        raw_query_position = query_anchor_logits.squeeze(1).argmax(dim=-1)
+        (
+            _,
+            preliminary_operation_positions,
+            _,
+            _,
+        ) = _shared_operation_viterbi_decode(
+            operation_anchor_logits,
+            raw_query_position,
+        )
+        # A raw slot-0 reader and the shared recurrent path fail in opposite
+        # directions under layout transfer: the raw reader can lock onto an
+        # instruction word, while the recurrent path can insert a prefix
+        # triple.  Their later start is a conservative, task-agnostic section
+        # boundary.  It closes the entity table and then becomes a hard lower
+        # bound for a second operation decode.
+        raw_first_operation_position = operation_anchor_logits[
+            :, 0, 0
+        ].argmax(dim=-1)
+        first_operation_position = torch.maximum(
+            preliminary_operation_positions[:, 0, 0],
+            raw_first_operation_position,
+        )
+        (
+            entity_name_probabilities,
+            entity_value_probabilities,
+            entity_name_positions,
+            entity_value_positions,
+            entity_mask,
+            entity_pair_gains,
+        ) = _shared_entity_viterbi_decode(
+            entity_name_logits,
+            entity_value_logits,
+            first_operation_position,
+        )
+        (
+            operation_anchor_probabilities,
+            operation_anchor_positions,
+            operation_mask,
+            operation_triple_gains,
+        ) = _shared_operation_viterbi_decode(
+            operation_anchor_logits,
+            raw_query_position,
+            minimum_position=first_operation_position,
+        )
+        # Complete the bidirectional section refinement.  The conservative
+        # preliminary operation boundary is intentionally allowed to be early
+        # so that operation decoding cannot consume the entity table.  Once
+        # the ordered operation path has found its actual first family token,
+        # that sharper boundary must be fed back into the entity decoder.
+        # Without this final pass, an early preliminary boundary can truncate
+        # the fifth entity even though the refined operation path is exact.
+        refined_first_operation_position = operation_anchor_positions[
+            :, 0, 0
+        ]
+        (
+            entity_name_probabilities,
+            entity_value_probabilities,
+            entity_name_positions,
+            entity_value_positions,
+            entity_mask,
+            entity_pair_gains,
+        ) = _shared_entity_viterbi_decode(
+            entity_name_logits,
+            entity_value_logits,
+            refined_first_operation_position,
+        )
+        operation_contexts = torch.einsum(
+            "bors,bsd->bord",
+            operation_anchor_probabilities,
+            semantic_source,
+        )
+        source_identity_tokens = (
+            _anchor_window_tokens_from_probabilities(
+                operation_anchor_probabilities[:, :, 1],
+                semantic_source,
+                mask,
+                start_offset=IDENTITY_WINDOW_START,
+                width=IDENTITY_WINDOW_TOKENS,
+            )
+        )
+        target_identity_tokens = (
+            _anchor_window_tokens_from_probabilities(
+                operation_anchor_probabilities[:, :, 2],
+                semantic_source,
+                mask,
+                start_offset=IDENTITY_WINDOW_START,
+                width=IDENTITY_WINDOW_TOKENS,
+            )
+        )
+        entity_identity_tokens = (
+            _anchor_window_tokens_from_probabilities(
+                entity_name_probabilities,
+                semantic_source,
+                mask,
+                start_offset=IDENTITY_WINDOW_START,
+                width=IDENTITY_WINDOW_TOKENS,
+            )
+        )
+        entity_value_context = torch.einsum(
+            "bes,bsd->bed",
+            entity_value_probabilities,
+            semantic_source,
+        )
+        entity_identity_tokens = self.entity_identity_norm(
+            entity_identity_tokens
+        )
+        entity_identities = entity_identity_tokens.mean(dim=-2)
+        entity_payload_latents = self.entity_payload_norm(
+            entity_queries + entity_value_context
+        )
+        # Family semantics are recurrent and slot-anonymous.  Capacity slots
+        # beyond the supervised horizon must not inject their untrained
+        # positional query into the classifier.  A schema-conditioned prior
+        # pooled only from supervised readers is shared across every step;
+        # the decoded family-token context supplies step-local evidence.
+        shared_family_query = operation_queries[
+            :, : min(
+                self.config.maximum_operations,
+                OPERATION_POTENTIAL_VOTERS,
+            ),
+            0,
+        ].mean(dim=1, keepdim=True)
+        family_latents = self.family_norm(
+            shared_family_query.expand(-1, self.config.maximum_operations, -1)
+            + operation_contexts[:, :, 0]
+        )
+        source_identity_tokens = self.operation_identity_norm(
+            source_identity_tokens
+        )
+        target_identity_tokens = self.operation_identity_norm(
+            target_identity_tokens
+        )
+        source_identities = source_identity_tokens.mean(dim=-2)
+        target_identities = target_identity_tokens.mean(dim=-2)
 
-        source_float_mask = source_attention_mask.unsqueeze(-1).to(
-            dtype=semantic_source.dtype
+        query_identity_tokens = _anchor_window_tokens(
+            query_anchor_logits,
+            semantic_source,
+            mask,
+            start_offset=IDENTITY_WINDOW_START,
+            width=IDENTITY_WINDOW_TOKENS,
         )
-        global_source = (
-            semantic_source * source_float_mask
-        ).sum(dim=1) / source_float_mask.sum(dim=1).clamp_min(1.0)
-        entity_count_logits = self.entity_count_head(global_source)
-        entity_presence_logits, entity_mask = _categorical_prefix(
-            entity_count_logits
+        query_identity_tokens = self.query_identity_norm(
+            query_identity_tokens
         )
-        operation_presence_logits = self.operation_presence_head(
-            family_latents
-        ).squeeze(-1)
-        operation_mask = _prefix_mask(
-            operation_presence_logits, minimum=1
+        query_identity = query_identity_tokens.mean(dim=-2).squeeze(1)
+
+        entity_presence_logits = torch.where(
+            entity_mask,
+            entity_queries.new_full((), 20.0),
+            entity_queries.new_full((), -20.0),
+        )
+        operation_presence_logits = torch.where(
+            operation_mask,
+            operation_queries.new_full((), 20.0),
+            operation_queries.new_full((), -20.0),
         )
 
         value_logits = self.value_head(entity_payload_latents)
         family_logits = self.family_head(family_latents)
-        query_pointer_logits = _cosine_pointer_logits(
-            query_identity,
-            entity_identities,
+        query_pointer_logits = _aligned_window_pointer_logits(
+            query_identity_tokens,
+            entity_identity_tokens,
+            self.identity_query,
+            self.identity_entity,
+            self.config.pointer_scale,
+        ).squeeze(1)
+        source_pointer_logits = _aligned_window_pointer_logits(
+            source_identity_tokens,
+            entity_identity_tokens,
             self.identity_query,
             self.identity_entity,
             self.config.pointer_scale,
         )
-        source_pointer_logits = _cosine_pointer_logits(
-            source_identities,
-            entity_identities,
-            self.identity_query,
-            self.identity_entity,
-            self.config.pointer_scale,
-        )
-        target_pointer_logits = _cosine_pointer_logits(
-            target_identities,
-            entity_identities,
+        target_pointer_logits = _aligned_window_pointer_logits(
+            target_identity_tokens,
+            entity_identity_tokens,
             self.identity_query,
             self.identity_entity,
             self.config.pointer_scale,
@@ -747,7 +1296,6 @@ class A120DFactorizedCompiler(nn.Module):
             {
                 "entity_presence_logits": entity_presence_logits,
                 "operation_presence_logits": operation_presence_logits,
-                "entity_count_logits": entity_count_logits,
                 "value_mapping_logits": value_logits,
                 "family_mapping_logits": family_logits,
                 "query_pointer_logits": query_pointer_logits,
@@ -767,7 +1315,18 @@ class A120DFactorizedCompiler(nn.Module):
                 "query_identity_latent": query_identity,
                 "entity_name_anchor_logits": entity_name_logits,
                 "entity_value_anchor_logits": entity_value_logits,
+                "predicted_entity_name_anchor_positions": (
+                    entity_name_positions
+                ),
+                "predicted_entity_value_anchor_positions": (
+                    entity_value_positions
+                ),
+                "entity_pair_score_gains": entity_pair_gains,
                 "operation_anchor_logits": operation_anchor_logits,
+                "predicted_operation_anchor_positions": (
+                    operation_anchor_positions
+                ),
+                "operation_triple_score_gains": operation_triple_gains,
                 "query_anchor_logits": query_anchor_logits.squeeze(1),
             }
         )
@@ -929,6 +1488,35 @@ class A120CFullTextBoundary(nn.Module):
             "straight_through_training_only": self.config.credit_mode
             == "straight_through",
             "source_direct_answer_head": False,
+            "structural_entity_cardinality": (
+                self.config.compiler == "factorized"
+            ),
+            "shared_entity_viterbi_decode": (
+                self.config.compiler == "factorized"
+            ),
+            "shared_operation_viterbi_decode": (
+                self.config.compiler == "factorized"
+            ),
+            "operation_potential_voters": (
+                OPERATION_POTENTIAL_VOTERS
+                if self.config.compiler == "factorized"
+                else None
+            ),
+            "operation_supported_gain_threshold": (
+                OPERATION_SUPPORTED_GAIN_THRESHOLD
+                if self.config.compiler == "factorized"
+                else None
+            ),
+            "operation_recurrent_gain_threshold": (
+                OPERATION_RECURRENT_GAIN_THRESHOLD
+                if self.config.compiler == "factorized"
+                else None
+            ),
+            "operation_crossing_gain_threshold": (
+                OPERATION_CROSSING_GAIN_THRESHOLD
+                if self.config.compiler == "factorized"
+                else None
+            ),
             "core_frozen": core_frozen,
             "core_state_sha256": module_state_sha256(self.core),
             "config": asdict(self.config),

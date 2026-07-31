@@ -15,7 +15,11 @@ from yggdrasil_v2.reasoning_medium.a1_19h_model import (
     A119HConfig,
     A119HHybridReasoner,
 )
-from yggdrasil_v2.reasoning_medium.a1_20b_cache import select_a120b_overfit32
+from yggdrasil_v2.reasoning_medium.a1_20b_cache import (
+    CACHE_SCHEMA,
+    _recover_cached_split,
+    select_a120b_overfit32,
+)
 from yggdrasil_v2.reasoning_medium.a1_20b_diagnostics import (
     ORACLE_FIELDS,
     select_a120b_variant_controls,
@@ -75,6 +79,51 @@ def test_a120b_continuous_payload_core_path_matches_one_hot_exactly(tmp_path) ->
     )
     assert torch.equal(baseline["state_logits"], continuous["state_logits"])
     assert torch.equal(baseline["answer_logits"], continuous["answer_logits"])
+
+
+def test_a120b_interrupted_cache_can_be_strictly_recovered(tmp_path) -> None:
+    records = sorted(
+        load_a119h2_records(_data(tmp_path), "train")[:3],
+        key=lambda record: (
+            int(record["entity_count"]),
+            int(record["program_length"]),
+            record["fingerprint"],
+        ),
+    )
+    cache_dir = tmp_path / "cache" / "train"
+    cache_dir.mkdir(parents=True)
+    for shard_index, start in enumerate(range(0, len(records), 2)):
+        shard_records = records[start : start + 2]
+        lengths = torch.tensor(
+            [5 + index for index in range(len(shard_records))],
+            dtype=torch.long,
+        )
+        maximum = int(lengths.max())
+        mask = torch.arange(maximum).unsqueeze(0) < lengths.unsqueeze(1)
+        torch.save(
+            {
+                "schema_version": CACHE_SCHEMA,
+                "last_hidden": torch.randn(
+                    len(shard_records), maximum, 8, dtype=torch.float16
+                ),
+                "attention_mask": mask,
+                "token_lengths": lengths,
+                "fingerprints": [
+                    record["fingerprint"] for record in shard_records
+                ],
+                "example_ids": [
+                    record["example_id"] for record in shard_records
+                ],
+            },
+            cache_dir / f"shard_{shard_index:05d}.pt",
+        )
+    report = _recover_cached_split(
+        records, cache_dir, max_length=32, shard_size=2
+    )
+    assert report["examples"] == 3
+    assert report["source_tokens"] == 16
+    assert report["maximum_token_length"] == 6
+    assert report["recovered_existing_shards"] is True
 
 
 def test_a120b_boundary_predicts_all_masks_roles_and_controls(tmp_path) -> None:

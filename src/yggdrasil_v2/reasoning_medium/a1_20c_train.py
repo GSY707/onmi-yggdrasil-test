@@ -14,6 +14,7 @@ from torch import nn
 
 from .a1_9_model import module_state_sha256
 from .a1_13_train import _write_json
+from .a1_19h_h2_data import FORMAL_SPLITS
 from .a1_19h_h2_train import load_a119h2_deployment
 from .a1_20b_cache import (
     A120BCachedSplit,
@@ -43,8 +44,48 @@ from .a1_20c_supervision import (
 
 CHECKPOINT_SCHEMA = "yggdrasil.v2-a1.20c.boundary.checkpoint.v1"
 RESULTS_SCHEMA = "yggdrasil.v2-a1.20c.boundary.results.v1"
+FORMAL_SCHEMA = "yggdrasil.v2-a1.20c.boundary.formal.v1"
+PROBE_SCHEMA = "yggdrasil.v2-a1.20c.boundary.split-probe.v1"
 ANCHOR_LOSS_WEIGHT = 1.0
 PAYLOAD_REGRESSION_WEIGHT = 10.0
+
+
+def _compatible_qwen_cache_contract(
+    evaluation_manifest: dict[str, Any],
+    training_manifest: dict[str, Any],
+) -> dict[str, Any]:
+    """Require one frozen Qwen contract while permitting a larger eval cap."""
+
+    stable_fields = (
+        "data_manifest_sha256",
+        "model_id",
+        "revision",
+        "tokenizer_revision",
+        "dtype",
+        "hidden_layer",
+    )
+    stable = {name: training_manifest[name] for name in stable_fields}
+    if any(
+        evaluation_manifest[name] != expected
+        for name, expected in stable.items()
+    ):
+        raise ValueError("A1.20C evaluation/training Qwen contract mismatch")
+    if training_manifest.get("silent_truncation") is not False:
+        raise ValueError("A1.20C training cache must prohibit truncation")
+    if evaluation_manifest.get("silent_truncation") is not False:
+        raise ValueError("A1.20C evaluation cache must prohibit truncation")
+    training_max = int(training_manifest["max_length"])
+    evaluation_max = int(evaluation_manifest["max_length"])
+    if evaluation_max < training_max:
+        raise ValueError(
+            "A1.20C evaluation max_length must cover training max_length"
+        )
+    return {
+        **stable,
+        "training_max_length": training_max,
+        "evaluation_max_length": evaluation_max,
+        "silent_truncation": False,
+    }
 
 
 def _pin_a120c_anchors(
@@ -135,14 +176,20 @@ class A120CTrainSpec:
     core_model_seed: int
     compiler: str
     credit_mode: str
+    schedule_seed: int | None = None
     steps: int = 5000
     batch_size: int = 16
     learning_rate: float = 3e-4
     state_loss_weight: float = 1.0
     state_tail_weight: float = 0.0
     state_tail_fraction: float = 0.01
+    pointer_tail_weight: float = 0.0
+    pointer_tail_fraction: float = 0.01
+    control_tail_weight: float = 0.0
+    control_tail_fraction: float = 0.01
     payload_regression_weight: float = PAYLOAD_REGRESSION_WEIGHT
     optimization_scope: str = "all"
+    objective_scope: str = "full"
     validation_interval: int = 200
 
 
@@ -165,8 +212,15 @@ def compute_a120c_loss(
     state_loss_weight: float = 1.0,
     state_tail_weight: float = 0.0,
     state_tail_fraction: float = 0.01,
+    pointer_tail_weight: float = 0.0,
+    pointer_tail_fraction: float = 0.01,
+    control_tail_weight: float = 0.0,
+    control_tail_fraction: float = 0.01,
     payload_regression_weight: float = PAYLOAD_REGRESSION_WEIGHT,
+    objective_scope: str = "full",
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
+    if objective_scope not in {"full", "anchor_only"}:
+        raise ValueError(f"unknown A1.20C objective scope {objective_scope}")
     if state_loss_weight < 0:
         raise ValueError("A1.20C state loss weight must be non-negative")
     if payload_regression_weight < 0:
@@ -178,6 +232,18 @@ def compute_a120c_loss(
     if not 0 < state_tail_fraction <= 1:
         raise ValueError(
             "A1.20C state tail fraction must be in (0, 1]"
+        )
+    if pointer_tail_weight < 0:
+        raise ValueError("A1.20C pointer tail weight must be non-negative")
+    if not 0 < pointer_tail_fraction <= 1:
+        raise ValueError(
+            "A1.20C pointer tail fraction must be in (0, 1]"
+        )
+    if control_tail_weight < 0:
+        raise ValueError("A1.20C control tail weight must be non-negative")
+    if not 0 < control_tail_fraction <= 1:
+        raise ValueError(
+            "A1.20C control tail fraction must be in (0, 1]"
         )
     base_loss, components = compute_a120b_loss(model, output, labels)
     zero = base_loss.new_zeros(())
@@ -231,18 +297,105 @@ def compute_a120c_loss(
             1, math.ceil(active_state_ce.numel() * state_tail_fraction)
         )
         state_tail_ce = active_state_ce.topk(tail_count).values.mean()
+    pointer_tail_ce = zero
+    if pointer_tail_weight > 0:
+        pointer_losses: list[torch.Tensor] = []
+        for logits_name, targets in (
+            ("source_pointer_logits", labels.source_targets),
+            ("target_pointer_logits", labels.target_targets),
+        ):
+            flat_targets = targets.reshape(-1)
+            per_pointer_ce = nn.functional.cross_entropy(
+                output[logits_name].reshape(
+                    -1, output[logits_name].shape[-1]
+                ),
+                flat_targets,
+                ignore_index=-100,
+                reduction="none",
+            )
+            pointer_losses.append(per_pointer_ce[flat_targets >= 0])
+        pointer_losses.append(
+            nn.functional.cross_entropy(
+                output["query_pointer_logits"],
+                labels.query_targets,
+                reduction="none",
+            )
+        )
+        active_pointer_ce = torch.cat(pointer_losses)
+        pointer_tail_count = max(
+            1,
+            math.ceil(
+                active_pointer_ce.numel() * pointer_tail_fraction
+            ),
+        )
+        pointer_tail_ce = active_pointer_ce.topk(
+            pointer_tail_count
+        ).values.mean()
+    control_tail_loss = zero
+    if control_tail_weight > 0:
+        entity_presence_loss = (
+            nn.functional.binary_cross_entropy_with_logits(
+                output["entity_presence_logits"],
+                labels.entity_presence,
+                reduction="none",
+            ).reshape(-1)
+        )
+        operation_presence_loss = (
+            nn.functional.binary_cross_entropy_with_logits(
+                output["operation_presence_logits"],
+                labels.operation_presence,
+                reduction="none",
+            ).reshape(-1)
+        )
+        flat_family_targets = labels.family_targets.reshape(-1)
+        family_loss = nn.functional.cross_entropy(
+            output["family_mapping_logits"].reshape(
+                -1, output["family_mapping_logits"].shape[-1]
+            ),
+            flat_family_targets,
+            ignore_index=-100,
+            reduction="none",
+        )
+        active_control_losses = torch.cat(
+            (
+                entity_presence_loss,
+                operation_presence_loss,
+                family_loss[flat_family_targets >= 0],
+            )
+        )
+        control_tail_count = max(
+            1,
+            math.ceil(
+                active_control_losses.numel() * control_tail_fraction
+            ),
+        )
+        control_tail_loss = active_control_losses.topk(
+            control_tail_count
+        ).values.mean()
+    anchor_loss = ANCHOR_LOSS_WEIGHT * sum(
+        anchor_components.values(), zero
+    )
     total = (
-        base_loss
-        + (state_loss_weight - 1.0) * components["state_ce"]
-        + state_tail_weight * state_tail_ce
-        + ANCHOR_LOSS_WEIGHT * sum(anchor_components.values(), zero)
-        + payload_regression_weight * payload_regression
+        anchor_loss
+        if objective_scope == "anchor_only"
+        else (
+            base_loss
+            + (state_loss_weight - 1.0) * components["state_ce"]
+            + state_tail_weight * state_tail_ce
+            + pointer_tail_weight * pointer_tail_ce
+            + control_tail_weight * control_tail_loss
+            + anchor_loss
+            + payload_regression_weight * payload_regression
+        )
     )
     return total, {
         **components,
         **anchor_components,
         "payload_regression_mse": payload_regression,
         "state_tail_ce": state_tail_ce,
+        "pointer_tail_ce": pointer_tail_ce,
+        "control_tail_loss": control_tail_loss,
+        "anchor_objective": anchor_loss,
     }
 
 
@@ -290,9 +443,18 @@ def evaluate_a120c_anchors(
         inputs, _ = collate_a120b_items(dataset.items(indices), device)
         anchors = supervision.select(indices, device)
         output = model(**inputs)
-        entity_name = output["entity_name_anchor_logits"].argmax(dim=-1)
-        entity_value = output["entity_value_anchor_logits"].argmax(dim=-1)
-        operation = output["operation_anchor_logits"].argmax(dim=-1)
+        entity_name = output.get(
+            "predicted_entity_name_anchor_positions",
+            output["entity_name_anchor_logits"].argmax(dim=-1),
+        )
+        entity_value = output.get(
+            "predicted_entity_value_anchor_positions",
+            output["entity_value_anchor_logits"].argmax(dim=-1),
+        )
+        operation = output.get(
+            "predicted_operation_anchor_positions",
+            output["operation_anchor_logits"].argmax(dim=-1),
+        )
         query = output["query_anchor_logits"].argmax(dim=-1)
         name_sequence, name_correct, name_total = _exact_flags(
             entity_name, anchors.entity_name_targets
@@ -343,6 +505,44 @@ def evaluate_a120c_anchors(
         "all_anchor_sequence_exact": counters["all_anchor_sequence"]
         / examples,
     }
+
+
+def _a120c_training_selection_score(
+    spec: A120CTrainSpec,
+    validation: dict[str, Any],
+    anchor_validation: dict[str, Any],
+) -> tuple[tuple[float, ...], dict[str, float]]:
+    if spec.objective_scope != "anchor_only":
+        return _validation_score(validation)
+    if not anchor_validation.get("applicable"):
+        raise ValueError("anchor-only objective requires structured compiler")
+    if spec.optimization_scope == "operation_anchor":
+        components = {
+            "operation_anchor_token": float(
+                anchor_validation["operation_role_token_accuracy"]
+            ),
+            "operation_anchor_sequence": float(
+                anchor_validation["operation_role_sequence_exact"]
+            ),
+        }
+    elif spec.optimization_scope == "entity_anchor":
+        components = {
+            "entity_anchor_token": min(
+                float(anchor_validation["entity_name_token_accuracy"]),
+                float(anchor_validation["entity_value_token_accuracy"]),
+            ),
+            "entity_anchor_sequence": min(
+                float(anchor_validation["entity_name_sequence_exact"]),
+                float(anchor_validation["entity_value_sequence_exact"]),
+            ),
+        }
+    else:
+        components = {
+            "all_anchor_sequence": float(
+                anchor_validation["all_anchor_sequence_exact"]
+            )
+        }
+    return tuple(reversed(tuple(components.values()))), components
 
 
 def _checkpoint(
@@ -448,9 +648,36 @@ def train_a120c_arm(
         train_dataset.hidden_width, core_checkpoint, spec, device
     )
     core_hash = module_state_sha256(model.core)
-    if spec.optimization_scope not in {"all", "identity", "payload"}:
+    if spec.optimization_scope not in {
+        "all",
+        "control",
+        "identity",
+        "entity",
+        "entity_anchor",
+        "operation",
+        "operation_anchor",
+        "payload",
+        "structure_anchor",
+    }:
         raise ValueError(
             f"unknown A1.20C optimization scope {spec.optimization_scope}"
+        )
+    if spec.objective_scope not in {"full", "anchor_only"}:
+        raise ValueError(
+            f"unknown A1.20C objective scope {spec.objective_scope}"
+        )
+    if (
+        spec.objective_scope == "anchor_only"
+        and spec.optimization_scope
+        not in {
+            "operation_anchor",
+            "entity_anchor",
+            "structure_anchor",
+        }
+    ):
+        raise ValueError(
+            "A1.20C anchor-only objective requires an anchor-only "
+            "optimization scope"
         )
     if spec.optimization_scope == "payload":
         payload_prefixes = (
@@ -460,6 +687,85 @@ def train_a120c_arm(
         for name, parameter in model.named_parameters():
             if parameter.requires_grad and not name.startswith(
                 payload_prefixes
+            ):
+                parameter.requires_grad_(False)
+    elif spec.optimization_scope == "control":
+        control_prefixes = (
+            "boundary.family_head.",
+        )
+        for name, parameter in model.named_parameters():
+            if parameter.requires_grad and not name.startswith(
+                control_prefixes
+            ):
+                parameter.requires_grad_(False)
+    elif spec.optimization_scope == "operation":
+        operation_prefixes = (
+            "boundary.operation_role_queries",
+            "boundary.operation_reader.",
+            "boundary.operation_anchors.",
+            "boundary.family_norm.",
+            "boundary.operation_identity_norm.",
+            "boundary.family_head.",
+            "boundary.identity_query.",
+            "boundary.identity_entity.",
+        )
+        for name, parameter in model.named_parameters():
+            if parameter.requires_grad and not name.startswith(
+                operation_prefixes
+            ):
+                parameter.requires_grad_(False)
+    elif spec.optimization_scope == "operation_anchor":
+        operation_anchor_prefixes = (
+            "boundary.operation_role_queries",
+            "boundary.operation_reader.",
+            "boundary.operation_anchors.",
+        )
+        for name, parameter in model.named_parameters():
+            if parameter.requires_grad and not name.startswith(
+                operation_anchor_prefixes
+            ):
+                parameter.requires_grad_(False)
+    elif spec.optimization_scope == "entity":
+        entity_prefixes = (
+            "boundary.entity_role_query",
+            "boundary.entity_reader.",
+            "boundary.entity_name_anchor.",
+            "boundary.entity_value_anchor.",
+            "boundary.entity_identity_norm.",
+            "boundary.entity_payload_norm.",
+            "boundary.value_head.",
+            "boundary.payload_head.",
+        )
+        for name, parameter in model.named_parameters():
+            if parameter.requires_grad and not name.startswith(
+                entity_prefixes
+            ):
+                parameter.requires_grad_(False)
+    elif spec.optimization_scope == "entity_anchor":
+        entity_anchor_prefixes = (
+            "boundary.entity_role_query",
+            "boundary.entity_reader.",
+            "boundary.entity_name_anchor.",
+            "boundary.entity_value_anchor.",
+        )
+        for name, parameter in model.named_parameters():
+            if parameter.requires_grad and not name.startswith(
+                entity_anchor_prefixes
+            ):
+                parameter.requires_grad_(False)
+    elif spec.optimization_scope == "structure_anchor":
+        structure_anchor_prefixes = (
+            "boundary.entity_role_query",
+            "boundary.entity_reader.",
+            "boundary.entity_name_anchor.",
+            "boundary.entity_value_anchor.",
+            "boundary.operation_role_queries",
+            "boundary.operation_reader.",
+            "boundary.operation_anchors.",
+        )
+        for name, parameter in model.named_parameters():
+            if parameter.requires_grad and not name.startswith(
+                structure_anchor_prefixes
             ):
                 parameter.requires_grad_(False)
     elif spec.optimization_scope == "identity":
@@ -525,7 +831,12 @@ def train_a120c_arm(
             "source_step": int(initial["step"]),
             "optimizer_resumed": resume_optimizer,
         }
-    rng = random.Random(spec.reader_seed)
+    schedule_seed = (
+        spec.reader_seed
+        if spec.schedule_seed is None
+        else spec.schedule_seed
+    )
+    rng = random.Random(schedule_seed)
     schedule = (
         None
         if overfit_mode
@@ -580,7 +891,9 @@ def train_a120c_arm(
             device,
             batch_size=spec.batch_size,
         )
-        best_score, _ = _validation_score(initial_validation)
+        best_score, _ = _a120c_training_selection_score(
+            spec, initial_validation, initial_anchor_validation
+        )
         best_step = 0
         best_validation = initial_validation
         best_anchor_validation = initial_anchor_validation
@@ -616,7 +929,12 @@ def train_a120c_arm(
             state_loss_weight=spec.state_loss_weight,
             state_tail_weight=spec.state_tail_weight,
             state_tail_fraction=spec.state_tail_fraction,
+            pointer_tail_weight=spec.pointer_tail_weight,
+            pointer_tail_fraction=spec.pointer_tail_fraction,
+            control_tail_weight=spec.control_tail_weight,
+            control_tail_fraction=spec.control_tail_fraction,
             payload_regression_weight=spec.payload_regression_weight,
+            objective_scope=spec.objective_scope,
         )
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
@@ -651,7 +969,9 @@ def train_a120c_arm(
                 device,
                 batch_size=spec.batch_size,
             )
-            score, score_components = _validation_score(validation)
+            score, score_components = _a120c_training_selection_score(
+                spec, validation, anchor_validation
+            )
             row = {
                 "step": step,
                 "loss": float(loss.detach()),
@@ -665,6 +985,7 @@ def train_a120c_arm(
                 "validation_score_components": score_components,
             }
             history.append(row)
+            _write_json(output_dir / "history.json", history)
             checkpoint = _checkpoint(
                 model,
                 optimizer,
@@ -838,5 +1159,168 @@ def load_a120c_checkpoint(
     model.a120c_core_model_seed = int(
         checkpoint["train_spec"]["core_model_seed"]
     )
+    model.a120c_core_state_sha256 = checkpoint["core_state_sha256"]
+    model.a120c_cache_manifest_sha256 = checkpoint[
+        "cache_manifest_sha256"
+    ]
     model.eval()
     return model
+
+
+@torch.inference_mode()
+def evaluate_a120c_formal(
+    checkpoint: Path,
+    cache_dir: Path,
+    training_cache_dir: Path,
+    data_dir: Path,
+    *,
+    device: str = "cuda",
+    batch_size: int = 16,
+) -> dict[str, Any]:
+    model = load_a120c_checkpoint(checkpoint, device)
+    formal_manifest = json.loads(
+        (cache_dir / "manifest.json").read_text(encoding="utf-8")
+    )
+    training_manifest_path = training_cache_dir / "manifest.json"
+    training_manifest = json.loads(
+        training_manifest_path.read_text(encoding="utf-8")
+    )
+    for manifest in (formal_manifest, training_manifest):
+        if manifest.get("schema_version") != CACHE_MANIFEST_SCHEMA:
+            raise ValueError("A1.20C formal requires A1.20B caches")
+    if file_sha256(training_manifest_path) != (
+        model.a120c_cache_manifest_sha256
+    ):
+        raise ValueError("A1.20C training cache does not match checkpoint")
+    if not set(FORMAL_SPLITS).issubset(formal_manifest["splits"]):
+        raise ValueError("A1.20C formal cache is missing formal splits")
+    formal_contract = _compatible_qwen_cache_contract(
+        formal_manifest, training_manifest
+    )
+    first_split = A120BCachedSplit(
+        cache_dir, data_dir, FORMAL_SPLITS[0]
+    )
+    if first_split.hidden_width != model.config.source_width:
+        raise ValueError("A1.20C formal hidden width mismatch")
+    results = {
+        split: evaluate_a120b_matrix(
+            model,
+            A120BCachedSplit(cache_dir, data_dir, split),
+            device,
+            batch_size=batch_size,
+        )
+        for split in FORMAL_SPLITS
+    }
+    thresholds = {
+        "short_regression": 0.95,
+        "supported_in_range": 0.95,
+        "relation_in_range": 0.95,
+        "supported_ood": 0.90,
+        "relation_ood": 0.90,
+        "entity_heldout": 0.90,
+        "entity_relation_heldout": 0.90,
+        "causal_core": 0.95,
+    }
+    gates: dict[str, bool] = {}
+    for split, threshold in thresholds.items():
+        aggregate = results[split]["aggregate"]
+        for metric in (
+            "trajectory_full_exact",
+            "final_state_full_exact",
+            "final_answer_accuracy",
+        ):
+            gates[f"{split}_{metric}"] = aggregate[metric] >= threshold
+        gates[f"{split}_mapping"] = (
+            aggregate["mapping_accuracy"]["minimum"] >= 0.995
+        )
+    gates.update(
+        {
+            "all_state_token_at_least_0_995": all(
+                results[split]["aggregate"]["state_token_accuracy"]
+                >= 0.995
+                for split in FORMAL_SPLITS
+            ),
+            "all_answer_state_identity": all(
+                results[split]["aggregate"][
+                    "answer_state_logits_identity"
+                ]["gate"]
+                for split in FORMAL_SPLITS
+            ),
+            "core_hash_unchanged": module_state_sha256(model.core)
+            == model.a120c_core_state_sha256,
+            "architecture_integrity": model.integrity_report()["passed"],
+        }
+    )
+    return {
+        "schema_version": FORMAL_SCHEMA,
+        "checkpoint": str(checkpoint),
+        "cache_dir": str(cache_dir),
+        "training_cache_dir": str(training_cache_dir),
+        "data_dir": str(data_dir),
+        "reader_seed": model.a120c_reader_seed,
+        "data_seed": model.a120c_data_seed,
+        "core_model_seed": model.a120c_core_model_seed,
+        "cache_contract": formal_contract,
+        "splits": results,
+        "gates": gates,
+        "passed": all(gates.values()),
+    }
+
+
+@torch.inference_mode()
+def evaluate_a120c_split_probe(
+    checkpoint: Path,
+    cache_dir: Path,
+    training_cache_dir: Path,
+    data_dir: Path,
+    splits: Sequence[str],
+    *,
+    device: str = "cuda",
+    batch_size: int = 16,
+) -> dict[str, Any]:
+    if not splits:
+        raise ValueError("A1.20C split probe requires at least one split")
+    model = load_a120c_checkpoint(checkpoint, device)
+    manifest = json.loads(
+        (cache_dir / "manifest.json").read_text(encoding="utf-8")
+    )
+    training_manifest_path = training_cache_dir / "manifest.json"
+    training_manifest = json.loads(
+        training_manifest_path.read_text(encoding="utf-8")
+    )
+    for observed in (manifest, training_manifest):
+        if observed.get("schema_version") != CACHE_MANIFEST_SCHEMA:
+            raise ValueError("A1.20C split probe requires A1.20B caches")
+    if file_sha256(training_manifest_path) != (
+        model.a120c_cache_manifest_sha256
+    ):
+        raise ValueError("A1.20C split probe training cache mismatch")
+    missing = sorted(set(splits) - set(manifest["splits"]))
+    if missing:
+        raise ValueError(f"A1.20C split probe cache missing {missing}")
+    cache_contract = _compatible_qwen_cache_contract(
+        manifest, training_manifest
+    )
+    results = {
+        split: evaluate_a120b_matrix(
+            model,
+            A120BCachedSplit(cache_dir, data_dir, split),
+            device,
+            batch_size=batch_size,
+        )
+        for split in splits
+    }
+    return {
+        "schema_version": PROBE_SCHEMA,
+        "checkpoint": str(checkpoint),
+        "cache_dir": str(cache_dir),
+        "training_cache_dir": str(training_cache_dir),
+        "data_dir": str(data_dir),
+        "cache_contract": cache_contract,
+        "splits": results,
+        "core_hash_unchanged": module_state_sha256(model.core)
+        == model.a120c_core_state_sha256,
+        "architecture_integrity": model.integrity_report()["passed"],
+        "formal_gate": False,
+        "diagnostic_only": True,
+    }

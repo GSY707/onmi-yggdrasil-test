@@ -4,6 +4,8 @@
 
 本文提供专门面向 Google Gemini Deep Research 的可重复研究提示词和三天冲刺顺序。目的不是生成一份宽泛的“相关工作综述”，而是趁研究额度仍可用时，建立覆盖当前故障、后续架构和未来产品化问题的可核验资料库。研究结果是决策输入，不自动成为架构规范或实验事实。
 
+路线状态说明（2026-08-01）：本文的 A1-A4 与部分 B5 标签是 2026-07-14 时的历史专题分组，不再代表当前阶段顺序。当前路线把主动 I/O、工作树/记忆、异步节点、离线专家晋升与整机评测统一聚合为 V2-C；这些命令仍可用于文献检索，但正式实验边界以 [`v2-c-hierarchical-full-duplex-agent-experiment.md`](v2-c-hierarchical-full-duplex-agent-experiment.md) 和 [`next-stage-test-plan.md`](next-stage-test-plan.md) 为准。
+
 ## 1. 当前问题与研究优先级
 
 当前 A1.5 已证明 shared recurrent transition、Qwen hidden→latent 接口和 learned K=8 workspace 可以在 ordinary split 上训练成功，但没有通过 Gate：
@@ -245,7 +247,7 @@ H. 可机器合并清单：最后给出 JSON 数组，每篇论文包含 title�
 4. 如何报告 best/latest checkpoint、失败运行、中断和超参选择成本，避免只挑最优结果？
 5. 原始文本能力 retention 和 hidden bypass 应如何验证？
 
-输出一份 architecture-formal 计量规范和结果表 schema，可直接用于未来 A4 预注册，但不评价当前 A1.5 已通过。
+输出一份 architecture-formal 计量规范和结果表 schema，可直接用于未来 V2-A4 预注册，但不评价当前 A1.5 已通过。
 ```
 
 ### 专题十：不可单模态破解的文本—视觉—动作任务
@@ -279,7 +281,7 @@ H. 可机器合并清单：最后给出 JSON 数组，每篇论文包含 title�
 4. 从 teacher-specified READ/EMIT 过渡到自主调用时，如何处理空结果、超时、错误调用和恢复？
 5. active compute 收益如何排除总参数和训练数据增益？
 
-输出 V2-B3/B5 的研究地图、路由日志 schema、collapse 指标、故障注入和停止条件。
+输出 V2-B3 静态 FFN-MoE 与 V2-C C3 主动系统 Boundary 的研究地图、路由日志 schema、collapse 指标、故障注入和停止条件；不得把二者混为同一层路由。
 ```
 
 ### 专题十二：高保真 I/O 专家、引用句柄与输出仲裁
@@ -340,7 +342,7 @@ H. 可机器合并清单：最后给出 JSON 数组，每篇论文包含 title�
 
 重点检索 end-to-end agent benchmarks、long-horizon task evaluation、GUI/web/document agents、fault injection、recovery benchmarks、human intervention metrics、provenance evaluation 和 integrated multimodal systems。
 
-请设计至少三个候选场景，并分析可复现环境、数据权利、自动 verifier、失败成本、运行时长和单卡可行性。最终只保留一个最适合 A4 的架构完整版场景，给出 direct、text-CoT、single multimodal model、no-work-tree 基线，以及 OOD、故障、恢复、成本和旁路审计。
+请设计至少三个候选场景，并分析可复现环境、数据权利、自动 verifier、失败成本、运行时长和单卡可行性。最终只保留一个最适合 V2-C C5 的架构完整版场景，给出 direct、text-CoT、single multimodal model、Flat、Tree-sync 基线，以及 OOD、故障、恢复、成本和旁路审计。
 ```
 
 ### 专题十六：商用场景、安全、数据治理与单位经济
@@ -416,7 +418,7 @@ H. 可机器合并清单：最后给出 JSON 数组，每篇论文包含 title�
 5. 预注册实验：数据、seeds、训练预算、强基线、weak baselines、ordinary/composition/length、same-answer shuffle、角色置换、反事实和 trajectory 干预；
 6. Gate：final/state、相对 prefix/n-gram 基线、因果干预、成本和停止条件；
 7. 资源判断：能否在单卡 8GB 上形成有意义的 surrogate probe，哪些主张必须等待更大算力；
-8. 明确列出仍未解决的问题，以及为什么暂不进入 A3/A4/V2-B。
+8. 明确列出仍未解决的问题，以及为什么暂不进入 V2-A formal、V2-B 或 V2-C。
 
 最后生成一个“实现交接块”，内容足以交给代码智能体，但不要直接写代码。若现有证据不足以选择结构，应明确建议先补哪一个判别实验，而不是强行选型。
 ```

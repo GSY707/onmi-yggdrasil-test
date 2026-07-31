@@ -1,12 +1,14 @@
 # V2-A 路线重审：混合 core 与完整 R1 收敛
 
-日期：2026-07-17
+初版日期：2026-07-17
+
+高层路线修订：2026-08-01；V2-A 内部结论保留，旧 I/O→工作树→专家晋升→A4 顺序由 V2-C 统一系统实验直接替换
 
 状态：路线决策记录；A1.19H 已通过，A1.20B/A1.20C 均失败并触发停线，V2-A 当前不通过
 
 ## 1. 核心判断
 
-从完整白皮书看，宏观顺序仍然正确：必须先完成 R1/V2-A 的推理介质 Pareto 与 audit Gate，才能进入多模态 Boundary-MoE、FFN-MoE、主动调用、I/O、工作树和完整系统集成。不能用后续组件掩盖 latent reasoning medium 尚未成立。
+从完整白皮书看，宏观前置关系仍然正确：必须先完成 R1/V2-A 的推理介质 Pareto 与 audit Gate，才能进入 V2-B 静态多模态模型核；V2-B 通过后，主动调用、I/O、工作树、并发节点和能力演化才在 V2-C 统一系统实验中共同出现。不能用后续组件掩盖 latent reasoning medium 尚未成立。
 
 需要修正的是 A1.18B 后的微观顺序。白皮书要求语义推理主要在连续 `H_t` 中递归、每一步不经过词表采样和 token 回嵌；它同时明确允许离散控制事件、source handle、专家索引和阶段状态。因此“全连续寻址”不是白皮书硬门，A1.19R 不应决定整个 V2-A 生死。
 
@@ -83,9 +85,9 @@ target source 不再是进入 Pareto 前的独立硬门。白皮书明确把成�
 
 零 teacher、自监督 next-state 和完全无过程标签训练可以继续作为效率研究，但不属于白皮书成立的必要条件。真正的禁止项是推理/部署时 teacher 或 oracle 绕过 latent core。
 
-## 5. 完整白皮书顺序
+## 5. 完整白皮书顺序（2026-08-01 修订）
 
-R1/V2-A 通过后，原高层路线保持不变：V2-B/R2 验证文本、视觉和动作 Boundary experts；R3 验证 Dense 与 FFN-MoE 的同 active-compute 2×2；随后依次验证 I/O 专家、工作树/记忆树与恢复、离线专家晋升；最终 A4 在同一系统中关闭九项完整版条件。
+R1/V2-A 通过后，V2-B/R2-R3 只验证固定输入/输出下的文本、视觉和动作 Boundary experts、Attention Pump，以及 Dense 与 FFN-MoE 的同 active-compute 2×2。V2-B 通过后，不再依次启动旧 I/O、工作树/记忆、离线专家晋升和 A4；这些强耦合目标统一进入 V2-C 多层、多线程、树图混合全双工智能体，在 C0-C5 内构建和归因，并只由 C5 给出 `integrated-system` 结论。完整合同见 [`v2-c-hierarchical-full-duplex-agent-experiment.md`](v2-c-hierarchical-full-duplex-agent-experiment.md)。
 
 ## 6. 决策门
 

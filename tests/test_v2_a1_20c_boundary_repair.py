@@ -19,9 +19,17 @@ from yggdrasil_v2.reasoning_medium.a1_20b_train import encode_a120b_labels
 from yggdrasil_v2.reasoning_medium.a1_20c_model import (
     A120CConfig,
     A120CFullTextBoundary,
+    _anchor_window_context,
+    _aligned_window_pointer_logits,
+    _operation_count_from_gains,
+    _shared_operation_viterbi_decode,
+    _shared_entity_viterbi_decode,
 )
 from yggdrasil_v2.reasoning_medium.a1_20c_supervision import (
     _record_char_targets,
+)
+from yggdrasil_v2.reasoning_medium.a1_20c_train import (
+    _compatible_qwen_cache_contract,
 )
 
 
@@ -110,6 +118,183 @@ def test_a120c_flat_hard_is_a120b_exact() -> None:
     )
 
 
+def test_a120d_identity_window_reads_tokens_after_predicted_anchor() -> None:
+    values = torch.arange(6, dtype=torch.float32).view(1, 6, 1)
+    logits = torch.full((1, 1, 6), -100.0)
+    logits[:, :, 1] = 100.0
+    observed = _anchor_window_context(
+        logits,
+        values,
+        torch.ones(1, 6, dtype=torch.bool),
+        start_offset=1,
+        width=3,
+    )
+    assert torch.allclose(observed, torch.tensor([[[3.0]]]))
+
+
+def test_a120d_aligned_identity_window_preserves_token_order() -> None:
+    entities = torch.tensor(
+        [[[[1.0, 0.0], [0.0, 1.0]], [[0.0, 1.0], [1.0, 0.0]]]]
+    )
+    queries = entities[:, (0,)]
+    query_projection = torch.nn.Linear(2, 2, bias=False)
+    entity_projection = torch.nn.Linear(2, 2, bias=False)
+    with torch.no_grad():
+        query_projection.weight.copy_(torch.eye(2))
+        entity_projection.weight.copy_(torch.eye(2))
+    logits = _aligned_window_pointer_logits(
+        queries,
+        entities,
+        query_projection,
+        entity_projection,
+        scale=20.0,
+    )
+    assert logits.shape == (1, 1, 2)
+    assert logits.argmax(dim=-1).item() == 0
+    assert torch.equal(entities[:, 0].mean(dim=-2), entities[:, 1].mean(dim=-2))
+
+
+def test_a120d_shared_operation_viterbi_stops_before_query() -> None:
+    logits = torch.full((1, 3, 3, 14), -8.0)
+    for slot in range(3):
+        logits[:, slot, 0, 1] = 9.0
+        logits[:, slot, 0, 5] = 9.0
+        logits[:, slot, 1, 2] = 9.0
+        logits[:, slot, 1, 6] = 9.0
+        logits[:, slot, 2, 3] = 9.0
+        logits[:, slot, 2, 7] = 9.0
+    probabilities, selected, observed, gains = (
+        _shared_operation_viterbi_decode(
+            logits,
+            torch.tensor([10]),
+            triple_gain_threshold=5.0,
+        )
+    )
+    assert torch.equal(
+        observed, torch.tensor([[True, True, False]])
+    )
+    assert torch.equal(
+        selected[0, :2].reshape(-1),
+        torch.tensor([1, 2, 3, 5, 6, 7]),
+    )
+    assert torch.equal(
+        probabilities.argmax(dim=-1)[0, :2].reshape(-1),
+        torch.tensor([1, 2, 3, 5, 6, 7]),
+    )
+    assert gains[0, 0] > 5
+    assert gains[0, 1] < 5
+
+
+def test_a120d_operation_viterbi_excludes_unsupported_voter() -> None:
+    logits = torch.full((1, 3, 3, 14), -8.0)
+    for slot in range(2):
+        logits[:, slot, 0, 1] = 9.0
+        logits[:, slot, 1, 2] = 9.0
+        logits[:, slot, 2, 3] = 9.0
+    # The capacity-only third reader emits a stronger but invalid path.
+    logits[:, 2, 0, 5] = 20.0
+    logits[:, 2, 1, 6] = 20.0
+    logits[:, 2, 2, 7] = 20.0
+    probabilities, selected, observed, _ = (
+        _shared_operation_viterbi_decode(
+            logits,
+            torch.tensor([10]),
+            triple_gain_threshold=50.0,
+            potential_voters=2,
+        )
+    )
+    assert torch.equal(observed, torch.tensor([[True, False, False]]))
+    assert torch.equal(selected[0, 0], torch.tensor([1, 2, 3]))
+    assert torch.equal(
+        probabilities.argmax(dim=-1)[0, 0], torch.tensor([1, 2, 3])
+    )
+
+
+def test_a120d_operation_count_uses_crossing_hysteresis() -> None:
+    gains = torch.tensor(
+        [
+            [30.0, 11.5, 11.0, 8.0],
+            [30.0, 21.0, 12.0, 8.0],
+        ]
+    )
+    observed = _operation_count_from_gains(
+        gains,
+        supported_gain_threshold=19.0,
+        recurrent_gain_threshold=10.5,
+        potential_voters=2,
+    )
+    # A background peak before the crossing cannot unlock recurrence.  Once
+    # the high-confidence crossing succeeds, attenuated true gains may extend
+    # the recurrent path.
+    assert torch.equal(observed, torch.tensor([2, 4]))
+
+
+def test_a120d_entity_boundary_can_use_shared_operation_decode() -> None:
+    names = torch.full((1, 5, 14), -8.0)
+    values = torch.full((1, 5, 14), -8.0)
+    for slot in range(3):
+        names[:, slot, 1] = 9.0
+        names[:, slot, 4] = 9.0
+        values[:, slot, 2] = 9.0
+        values[:, slot, 5] = 9.0
+    decoded_program_start = torch.tensor([9])
+    *_, observed, _ = _shared_entity_viterbi_decode(
+        names, values, decoded_program_start
+    )
+    assert torch.equal(
+        observed,
+        torch.tensor([[True, True, False, False, False]]),
+    )
+
+
+def test_a120d_shared_entity_viterbi_stops_before_fake_pair() -> None:
+    names = torch.full((1, 5, 16), -8.0)
+    values = torch.full((1, 5, 16), -8.0)
+    for slot in range(4):
+        names[:, slot, 1] = 9.0
+        names[:, slot, 4] = 9.0
+        names[:, slot, 7] = 9.0
+        values[:, slot, 2] = 9.0
+        values[:, slot, 5] = 9.0
+        values[:, slot, 8] = 9.0
+    (
+        _,
+        _,
+        decoded_names,
+        decoded_values,
+        observed,
+        gains,
+    ) = _shared_entity_viterbi_decode(
+        names, values, torch.tensor([12])
+    )
+    assert torch.equal(
+        observed,
+        torch.tensor([[True, True, True, False, False]]),
+    )
+    assert torch.equal(decoded_names[0, :3], torch.tensor([1, 4, 7]))
+    assert torch.equal(decoded_values[0, :3], torch.tensor([2, 5, 8]))
+    assert gains[0, 1] > 5
+    assert gains[0, 2] < 5
+
+
+def test_a120d_eval_cache_can_raise_no_truncation_length_cap() -> None:
+    stable = {
+        "data_manifest_sha256": "data",
+        "model_id": "qwen",
+        "revision": "model-revision",
+        "tokenizer_revision": "tokenizer-revision",
+        "dtype": "float16",
+        "hidden_layer": "last",
+        "silent_truncation": False,
+    }
+    observed = _compatible_qwen_cache_contract(
+        {**stable, "max_length": 1280},
+        {**stable, "max_length": 1024},
+    )
+    assert observed["training_max_length"] == 1024
+    assert observed["evaluation_max_length"] == 1280
+
+
 def test_a120c_hierarchical_outputs_learned_anchors() -> None:
     model = A120CFullTextBoundary(
         A120CConfig(
@@ -149,7 +334,7 @@ def test_a120d_factorized_separates_identity_payload_and_control() -> None:
     )
     assert output["entity_identity_latents"].shape == (4, 5, 256)
     assert output["entity_payload_latents"].shape == (4, 5, 256)
-    assert output["entity_count_logits"].shape == (4, 5)
+    assert output["entity_presence_logits"].shape == (4, 5)
     assert output["operation_presence_logits"].shape == (4, 32)
     assert output["source_pointer_logits"].shape == (4, 32, 5)
     assert output["target_pointer_logits"].shape == (4, 32, 5)
@@ -158,6 +343,9 @@ def test_a120d_factorized_separates_identity_payload_and_control() -> None:
     assert output["hard_forward_answer_max_abs_delta"] <= 1e-6
     report = model.integrity_report()
     assert report["passed"]
+    assert report["structural_entity_cardinality"]
+    assert report["shared_entity_viterbi_decode"]
+    assert report["shared_operation_viterbi_decode"]
     assert not report["training_anchor_targets_are_forward_inputs"]
 
 

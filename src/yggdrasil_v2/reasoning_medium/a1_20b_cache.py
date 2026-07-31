@@ -177,6 +177,87 @@ def _cache_split(
     }
 
 
+def _recover_cached_split(
+    records: Sequence[dict[str, Any]],
+    output_dir: Path,
+    *,
+    max_length: int,
+    shard_size: int,
+) -> dict[str, Any]:
+    """Validate and reuse a split written before its manifest was committed."""
+    ordered = _ordered(records)
+    expected_paths = [
+        output_dir / f"shard_{index:05d}.pt"
+        for index, _ in enumerate(range(0, len(ordered), shard_size))
+    ]
+    actual_paths = sorted(output_dir.glob("*.pt"))
+    if actual_paths != expected_paths:
+        raise RuntimeError(
+            "incomplete A1.20B cache recovery set: "
+            f"expected {[path.name for path in expected_paths]}, "
+            f"found {[path.name for path in actual_paths]}"
+        )
+    total_tokens = maximum_token_length = 0
+    for shard_index, path in enumerate(actual_paths):
+        payload = torch.load(path, map_location="cpu", weights_only=True)
+        if payload.get("schema_version") != CACHE_SCHEMA:
+            raise RuntimeError(f"cache recovery schema mismatch: {path}")
+        forbidden = sorted(FORBIDDEN_FIELDS.intersection(payload))
+        if forbidden:
+            raise RuntimeError(
+                f"cache recovery found forbidden fields {forbidden}: {path}"
+            )
+        start = shard_index * shard_size
+        expected_records = ordered[start : start + shard_size]
+        expected_fingerprints = [
+            record["fingerprint"] for record in expected_records
+        ]
+        expected_example_ids = [
+            record["example_id"] for record in expected_records
+        ]
+        if payload.get("fingerprints") != expected_fingerprints:
+            raise RuntimeError(f"cache recovery fingerprint mismatch: {path}")
+        if payload.get("example_ids") != expected_example_ids:
+            raise RuntimeError(f"cache recovery example-id mismatch: {path}")
+        hidden = payload.get("last_hidden")
+        mask = payload.get("attention_mask")
+        lengths = payload.get("token_lengths")
+        if (
+            not isinstance(hidden, torch.Tensor)
+            or not isinstance(mask, torch.Tensor)
+            or not isinstance(lengths, torch.Tensor)
+            or hidden.ndim != 3
+            or mask.ndim != 2
+            or lengths.ndim != 1
+            or hidden.shape[:2] != mask.shape
+            or hidden.shape[0] != lengths.shape[0]
+            or hidden.shape[0] != len(expected_records)
+        ):
+            raise RuntimeError(f"cache recovery tensor-shape mismatch: {path}")
+        length_values = [int(value) for value in lengths.tolist()]
+        if (
+            any(value <= 0 or value > max_length for value in length_values)
+            or [int(value) for value in mask.sum(dim=1).tolist()]
+            != length_values
+        ):
+            raise RuntimeError(f"cache recovery token-length mismatch: {path}")
+        total_tokens += sum(length_values)
+        maximum_token_length = max(maximum_token_length, max(length_values))
+    return {
+        "examples": len(ordered),
+        "source_tokens": total_tokens,
+        "entity_counts": sorted({int(row["entity_count"]) for row in ordered}),
+        "program_lengths": sorted(
+            {int(row["program_length"]) for row in ordered}
+        ),
+        "maximum_token_length": maximum_token_length,
+        "shards": [path.name for path in actual_paths],
+        "seconds": 0.0,
+        "source_data_order": "entity_count_then_program_length_then_fingerprint",
+        "recovered_existing_shards": True,
+    }
+
+
 def cache_a120b_full_hidden(
     data_dir: Path,
     output_dir: Path,
@@ -192,24 +273,9 @@ def cache_a120b_full_hidden(
 ) -> dict[str, Any]:
     if device.startswith("cuda") and not torch.cuda.is_available():
         raise RuntimeError("A1.20B Qwen cache requested unavailable CUDA")
-    if output_dir.exists() and any(output_dir.rglob("*.pt")):
-        raise RuntimeError(f"refusing to mix A1.20B cache: {output_dir}")
+    if (output_dir / "manifest.json").exists():
+        raise RuntimeError(f"refusing to overwrite A1.20B cache: {output_dir}")
     output_dir.mkdir(parents=True, exist_ok=True)
-    from transformers import AutoTokenizer
-
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_id, revision=revision, use_fast=True
-    )
-    if tokenizer.pad_token_id is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    if device.startswith("cuda"):
-        torch.cuda.reset_peak_memory_stats()
-    backbone = load_qwen35_text_only(
-        model_id, revision, dtype=torch.float16, device=device
-    )
-    backbone.eval()
-    for parameter in backbone.parameters():
-        parameter.requires_grad_(False)
     selected = (
         select_a120b_overfit32(load_a119h2_records(data_dir, "train"))
         if overfit32
@@ -229,20 +295,66 @@ def cache_a120b_full_hidden(
         if overfit32
         else {split: split for split in selected_splits}
     )
+    unexpected_shards = [
+        path
+        for path in output_dir.rglob("*.pt")
+        if path.parent.name not in split_sources
+    ]
+    if unexpected_shards:
+        raise RuntimeError(
+            "refusing to mix A1.20B cache with unexpected shards: "
+            + ", ".join(str(path) for path in unexpected_shards)
+        )
+    split_records = {
+        split: selected or load_a119h2_records(data_dir, source_split)
+        for split, source_split in split_sources.items()
+    }
+    splits_to_encode = [
+        split
+        for split in split_sources
+        if not any((output_dir / split).glob("*.pt"))
+    ]
+    tokenizer = backbone = None
+    if splits_to_encode:
+        from transformers import AutoTokenizer
+
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_id, revision=revision, use_fast=True
+        )
+        if tokenizer.pad_token_id is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        if device.startswith("cuda"):
+            torch.cuda.reset_peak_memory_stats()
+        backbone = load_qwen35_text_only(
+            model_id, revision, dtype=torch.float16, device=device
+        )
+        backbone.eval()
+        for parameter in backbone.parameters():
+            parameter.requires_grad_(False)
     splits: dict[str, Any] = {}
     started = time.perf_counter()
     for split, source_split in split_sources.items():
-        records = selected or load_a119h2_records(data_dir, source_split)
-        report = _cache_split(
-            backbone,
-            tokenizer,
-            records,
-            output_dir / split,
-            device=device,
-            max_length=max_length,
-            inference_batch_size=inference_batch_size,
-            shard_size=shard_size,
-        )
+        records = split_records[split]
+        split_dir = output_dir / split
+        if any(split_dir.glob("*.pt")):
+            report = _recover_cached_split(
+                records,
+                split_dir,
+                max_length=max_length,
+                shard_size=shard_size,
+            )
+        else:
+            assert backbone is not None and tokenizer is not None
+            report = _cache_split(
+                backbone,
+                tokenizer,
+                records,
+                split_dir,
+                device=device,
+                max_length=max_length,
+                inference_batch_size=inference_batch_size,
+                shard_size=shard_size,
+            )
         report["source_data_split"] = source_split
         splits[split] = report
     manifest = {
@@ -276,15 +388,17 @@ def cache_a120b_full_hidden(
             time.perf_counter() - started
         ),
         "peak_allocated_bytes": int(torch.cuda.max_memory_allocated())
-        if device.startswith("cuda")
+        if device.startswith("cuda") and backbone is not None
         else None,
+        "recovered_without_reencoding": not splits_to_encode,
     }
     (output_dir / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    del backbone
-    if device.startswith("cuda"):
+    if backbone is not None:
+        del backbone
+    if device.startswith("cuda") and splits_to_encode:
         torch.cuda.empty_cache()
     return manifest
 
