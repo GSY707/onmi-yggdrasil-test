@@ -1,12 +1,38 @@
 # 下一阶段测试任务规划
 
-日期：2026-08-01
+更新日期：2026-09-02
 
 架构真源：`docs/Project-Yggdrasil 多模态潜变量推理架构白皮书 V2.md`
 
 总路线：`docs/Project-Yggdrasil V2 从架构验证到商用路线图.md`
 
-当前状态：A1.19H 已为 mixed latent core 形成 formal/causal `3/3`，A1.20D 又修复 full-text Boundary 的双向 section 一致性并形成强诊断正证据；但这些结果仍集中在 COPY/SWAP 状态机切面。A1.21P 因任务同构、prompt-only baseline 对监督 hybrid 不公平、样本与 fresh-seed/cost 证据不足而正式停止，`a121p_passed=false`、`a122a_authorized=false`。2026-07-29 已终止继续完善该切面的默认路线；2026-08-01 已由主设计层冻结 V2-R1R 的 ERE/CPS 生成算法、统一 model view、R1R-Latent v1、claim verifier 监督、公平 SFT、因果与成本 Gate。P0-D generator v1 与旧机器审计虽已完成并自判 10/10，但主设计层发现 ERE/CPS 满分结构化捷径、CPS claim 错标、split 污染和审计缺口，已正式否决。当前停止在 P0-D v2 修复，尚未启动 P0-M、模型或训练。V2-A 当前不通过。V2-C 系统实验合同只有设计地位，不构成越过 V2-A/V2-B 的实施许可。
+当前状态：A1.19H/A1.20D 的正证据仍集中在 COPY/SWAP 切面，A1.21P 因任务同构、baseline 不公平和 formal 缺口停止。V2-R1R 的 v17 production data 与 P0-M v5 training-path smoke 已 accepted，P1 v6/v6R 已资格化 causal-temporal witness。P1 v7 保留 temporal/state 机制但 CPS causal/OOD 失败；v8R 在 shared v7 checkpoint、完整 rehearsal 与同 mixed schedule 下仍失败。v8D 证明 CPS perturbation 已进入并被 `H_T` 放大，却没有形成跨 pair semantic reduction；v8L 又在 bootstrap 得到 ERE optimization/audit `0.7726/0.7109`、CPS `0.5682/0.5281` 后 fail-stop。匿名 K=8 + lexical-anchor 主线保持关闭，fresh v9 永久未获授权。P1-NR1 已以 N01–N07 全 true 的正式 PASS 关闭 numeric/relation measurement 前置缺口。H1 的完整-transition、互斥完整 FFN、2:1 residual、等分 residual 与 factorized routed projection 五个非正式方向均已否决；最后一个 full-budget screen 的 overall gain 为 `-0.01074`，wrong-route/conditional-write 最大效应仅 `0.00281/0.00781`，`authorizes=nothing`。calibration 与 H1 formal 未启动。K=1、文本基线、完整 P1/Pareto 与 P2 仍未完成。
+
+2026-08-21 的两个 H1-WD 非正式后继也都已 fail-stop：overlap-residual 只实现欧氏输出重参数化；decision-causal 又在 target Gate PASS 后因 W heldout transfer-nMSE `1.00450/0.99247` 停止，D/J 未运行。2026-08-23 唯一启动的 R0–R4 direction-geometry 诊断则在全量 replay identity Gate 以 `CRASH_NONFORMAL_H1_WD_DIRECTION_GEOMETRY` 停止；common/projection 漂移 `7.96914e-05/9.50396e-05` 超过 `2.5e-05`，R2–R4 未运行。相关 roots 均已消耗，仍不授权 calibration、H1 formal、F1 或 P2。
+
+direction-geometry v2 successor 已唯一完成并取得完整 R1–R4，机器终态为 `COMPLETE_NONFORMAL_H1_WD_DIRECTION_GEOMETRY_V2`，科学终态为 `NO_QUALIFIED_R2_R3_COMPONENT`。route-ID pairing 有显著语义，但 heldout route increment 仍为 `-0.586%`；projection trunk 的 `+3.189%` CI 跨零且 lambda 不稳定，exact shared head/sample local-J 分别为 `-0.334%/-5.922%`。R4 双 sketch residual 不与 current null 相容，但未完成 latent structure 归因。最强混杂是 nonzero target prevalence 从 train `4010/4096` 降到 heldout `591/1024`；该诊断当时只支持“若续研先测 target-before write gate”，不授权加强 projection。Closure C0 已在下段直接覆盖这条局部后继，direction-geometry 现在只作历史诊断，仍为 `authorizes=nothing`。
+
+项目随后停止局部 H1/WD 研究并返回整体 V2-A。2026-08-23 的 Closure C0 任务/公平基线资格审计已按 `V2-A-CLOSURE-C0-20260823-1` 单次完成：C001/C002/C003/C005/C007/C008 通过，C004/C006 失败。C004 确认 v17 ordinary ERE relation-query 由 generator 构造为全 TRUE，严格 source-only visible-legend oracle 在 train/validation/language OOD 条件准确率均为 `1.0`；这只污染约 8.33% 子组、最多抬升整 split 约 4.17pp，不等于 ERE/CPS 整体无效。C006 确认历史 compact trace 只有 formatter 与 final-answer parser，没有 full-bank roundtrip、semantic replay 或 fault-kill。机器终态 `FAIL_V2_A_CLOSURE_C0_READINESS`，seal `462317E7…9972`，没有训练或 C1 授权；该失败 root 保持不变。
+
+2026-08-24 的直接 successor C0R 已完成修复并单次正式封存。新 relation-balanced bank 的四个 relation cell 均为 TRUE/FALSE 配平，source-only oracle accuracy `0.5`；26,624 条 compact trace 全部 roundtrip/replay，`394,278/394,278` 定向故障被 kill，token max `389 < 512`。data/trace D001–D012 与 readiness C001–C008 全 PASS，readiness 机器终态为 `PASS_V2_A_CLOSURE_C0R_READINESS`，seal `161FBB36…0BA4`。两阶段均为零训练，`four_arm_results_present=false`、`v2a_passed=false`；其当时唯一授权是 C1 single-seed implementation/eligibility，不再研究 projection write gate，也不得提前运行 C2。
+
+该 C1 授权已经消费。旧 C1 joint answer/trace formal 在 G007 trace credit fail-stop；随后完成的只读归因确认随机 64-token chunk 存在 exposure hygiene 缺口且共享梯度冲突真实，但二者不足以解释整体 poststop 失败。独立 C1R 使用 fresh answer-only Stage A、fixed 6144-step endpoint，并把 complete-target trace probe 放到条件 Stage B；唯一 C1R formal 仍在第一个行为门 G004 失败：ERE/CPS validation accuracy `0.191406/0.156250`，train 为 `0.194092/0.152832`，Stage B 与其余 Gate 全部未运行。标签/legend/join 全量核对 0 mismatch。冻结轨迹的 H0/H1/H10 slot-centered energy 为 `195.31/23.34/0.140`，off-diagonal cosine 为 `0.94096/0.99299/0.999958`；H10 learned-query 与 uniform mean 的预测完全一致、平均 logit L2 差约 `1.13e-6`。准确结论是 final answer path 的 effective K≈1，而不是整个 latent/trace 空间数学上 K=1。C1R seal 完整且 `authorizes=nothing`，不得重跑、换 seed/checkpoint、补跑 Stage B 或直接进入 C2。
+
+C1S Addressed Content Workspace 已按新 package、新合同和新 output identity 直接切换。唯一 S0 zero-update 机制资格通过后，SRW S1 又以 fresh K8 固定 4,000 updates 完整运行：ERE/CPS answer 各 `16/16`，但 no-core overall 仍为 `28/32`，同记录至少两个因果贡献者仅 `7/32`、mean causal effective slots `1.58099`，且 CPS `running_best/final_winner` 与 ERE `changed/operation_source/touched` 未达到 S1 的 `0.95` 动态 BA 下限。机器终态为 `FAIL_V2_A_C1S_S1_QUALIFICATION`，result/seal `9D0B06E1…E38892`/`FAFF301A…68A9D2`，63/63 replay。S2、formal、C2 与 V2-A PASS 均未授权，当前 `authorizes=nothing`。
+
+随后唯一失败归因 diagnosis 的 preflight PASS，但 diagnosis 在 D004 nested readout 处 sealed CRASH：`CPS.running_best` 只有 12/16 条 record-macro eligible records，未分层的哈希 inner fold 出现 0 valid-record cell。D001–D003 的 sealed 部分证据仍按边界保留，旧身份禁止修补或重跑。新的 `TEMPORAL-ATTRIBUTION-REPAIR` 身份现已唯一完成 D004R/D005R：target-only folds、时序运动、固定通道分离、nested cross-fit readout、三类 fit-null、10k score-null 与 frozen decoder 均形成完整证据；CPS/ERE 因没有命中注册的 target/latent/readout 故障而均为 `INCONCLUSIVE`。result/seal `D1603C62…06A496`/`E8A61CF8…1562B0`，103/103 replay；准确结论是“Axis C 未找到主故障”，不是机制 PASS，结果 `authorizes=nothing`。
+
+2026-09-01 已按新 identity 实现并唯一完成 C1T Causally-Partitioned Workspace S0。它不再让 entity/operation/query readers 读取同一份完整 source hidden，而把每个对象卡、操作卡和查询卡作为一次独立冻结编码调用；卡间只能经公开 record-local address、注册 source→target operation 与 target-only transition 相互作用。新的 ERE XOR 和 CPS validity-parity 都是完整 2×2 factorial，翻转任一支持对象都改变 simulator answer，且只改变对应对象卡。preflight P001–P005 与正式 S001–S008 全 PASS；192 张卡由固定 Qwen3.5-2B 执行 192 次独立 forward，8 个 group 的 no-core max delta 全为 `0.0`，cache 写后 readback、对象隔离、目标槽唯一写入、置换等变和 BF16 backward 均通过。正式 result/seal 为 `831BC5…D6A8`/`E4D9B3…A0EE`，optimizer/model writes 为 `0/0`。这只授权 `C1T_S1_CONTRACT_DESIGN_ONLY`，训练仍未授权。
+
+该 S0 授权随后由用户明确启动的 fresh C1T S1 消费。唯一 preflight P101–P105 全 PASS，随后唯一正式 Overfit32 按冻结 schedule 完成 4,000 updates 并只写 `fixed_4000`；运行本身与 43/43 seal replay 完整，但 R103/R105 失败。overall answer 为 `22/32`，完整 factorial group 仅 `1/8` 全对；CPS/ERE two-contributor 分别为 `8/16` 与 `4/16`。no-core accuracy 已降至 `2/16` 与 `4/16`，且 no-core margin-drop/置换等变过门，这证明结构量具有效，却不能覆盖行为拟合和逐记录双对象因果失败。机器终态 `FAIL_V2_A_C1T_S1_QUALIFICATION`，result/seal/endpoint 为 `9B3762…C1DFF`/`89C530…9BCF`/`E7E66F…96F9`，`authorizes=nothing`；同一 identity 禁止重跑、续训、换 seed 或挑 checkpoint。
+
+随后完成的 post-stop 诊断把失败定位为多组共享训练中的 operation-2 dead-gate，而不是数据、route 或结构旁路。失败区域第二次 sigmoid gate 为 `10^-14–10^-6`，初始值约 `0.54`；支持对象 payload 差异仍存在，却在 final target/logits 前被截断。ERE-g00 的单条 hinge 梯度约 `4.95`，完整四格平均后仅 `1.92e-6`；counterpart stop-gradient ablation 将 factor-0 聚合梯度提高约 3,900 倍，但被关闭的 factor-1 仍近零。训练在 update 2198–2564 出现密集 pre-clip spikes 后进入 g01-only/半 parity 双平台，余弦 LR 随后锁定。fresh CUDA BF16 单组 ERE-g00 对照在 update 250 达到 full/support/two-contributor 全 `4/4`，排除了单组不可学习与基础 XOR 表达能力不足。该诊断 `authorizes=nothing`，没有修改正式 root 或创建 successor。
+
+用户随后授权按 Gate 顺序建立 fresh C1U Publicly-Grounded Gate-Free Workspace。唯一 S0 preflight/S0 已 sealed PASS，公开语义桥、真实 192-card Qwen cache、gate-free target overwrite 与 operation-2 梯度机制全部资格化。随后冻结的 fresh S1 保留 C1T 的 causal objective、optimizer、完整 group batch、4,000-step schedule 与行为 Gate，只移除 learned sigmoid gate；唯一 preflight P101–P105 全 PASS，唯一正式 S1 恰好完成 4,000 updates、单一 `fixed_4000` 写入，并在 R101–R107 全 PASS。终局为 answer `32/32`、factorial `8/8`、CPS/ERE no-core `4/16` 与 `2/16`、两个 support flip 与 two-contributor 均为每族 `16/16`；result/seal/endpoint `1FCD2D…6090C`/`A5211D…5350`/`88F538…159F`，44/44 replay。source identity `8BD618…94FD`，授权仅为 `C1U_S2_MATCHED_K1_K8_CONTRACT_DESIGN_ONLY`。
+
+2026-09-02，用户明确授权“只做多 bank，多 seed 先不做”，并启动 C1U S2。冻结 successor 使用六个 fresh、opaque-disjoint banks 和三个 4-train/2-heldout folds；三个 folds 与 K1/K8 两臂都重置到同一 scientific model seed `2026090211`。唯一 preflight P201–P207 sealed PASS；唯一 formal 完成六个 `fixed_4000` endpoints、24,000 updates 与六次 model write，但 R203/R204/R205 FAIL。K8/K1 heldout overall 为 `52/192`/`50/192`，K8 factorial `3/48`，overall paired gain 只有 `+1.04pp` 且 bank-cluster 95% 区间 `[-6.77pp,+9.38pp]`。formal result/seal 为 `F0EABD…6EAA4`/`00B782…25A4B`，76/76 replay，终态 `FAIL_V2_A_C1U_S2_QUALIFICATION`、`authorizes=nothing`。
+
+post-stop 只读归因进一步确认 K8 是 bank-conditional memorization：三个 endpoint 对各自 train banks 为 `128/128,128/128,126/128`，却在 heldout 只有 `18/64,16/64,18/64`。固定已拟合 B2，仅轮换公开 Choices 时，八个非零 rotations 合计 CPS/ERE 只有 `25/128`/`4/128` 等变；保持任务和标签不变、只把 64 个 opaque symbols 一致 alpha-rename 后，CPS/ERE 从各 `16/16` 降为 `0/16`/`4/16`。根因是 pooled query + fixed A–I head 不具 choice-label equivariance，whole-card pooled payload + MLP transition 不具 opaque-renaming invariance。当前建议仅为全新 symbol-bound choice workspace 的合同方向；尚未授权实现、S0、训练或新 root。
 
 ## 1. 路线直接切换
 
@@ -14,8 +40,8 @@
 
 旧 Stage A—AV-J-C 保留为代理实验历史，最高只能提供 mechanism/surrogate 证据。新的当前主线从 V2-A 开始：
 
-1. **V2-A：推理介质。**比较显式文本思维链、单向量 latent recurrence 和多向量 latent recurrence。
-2. **V2-B：静态多模态模型核。**使用 V2-A 胜出介质，验证固定输入/输出下的 Boundary-MoE、FFN-MoE、Attention Pump 和文本/视觉/动作表示。
+1. **V2-A：推理介质。**先比较 public/private 离散介质的逐 token 自回归与并行块生成，以及确定性的单向量/多向量 latent recurrence；固定臂资格化后，再判断是否需要带显式转换成本的融合体。
+2. **V2-B：静态多模态模型核。**使用 V2-A 资格化的固定介质或融合介质，验证固定输入/输出下的 Boundary-MoE、FFN-MoE、Attention Pump 和文本/视觉/动作表示。
 3. **V2-C：多层、多线程、树图混合全双工智能体。**把主动 Boundary、真实工具、工作树/记忆、人类目标连续性和隔离专家演化放在一个系统合同中验证。
 
 在 V2-A 正式通过前，不实现 V2-B；在 V2-B 正式通过前，不实现 V2-C。V2-C 的任务、协议、基线和 Gate 可以预先设计，但不得借此接入真实工具、启动系统训练或宣称整机能力。
@@ -36,7 +62,7 @@
 - 数据量：unique tokens/examples 与 processed tokens 分开；
 - 质量：最终 exact/episode success、heldout、长度外推和分任务指标；
 - 因果：no/shuffled input、no/shuffled latent、截短 trajectory 和必要 modality 消融；
-- 成本：训练时间、推理延迟、采样次数、latent transitions、峰值显存、KV/激活和估算 FLOPs；
+- 成本：训练时间、推理延迟（median/p95）、模型前向次数、categorical sampling 次数、输出 token/code 数、latent transitions、介质转换次数及其成本、峰值显存、KV/激活和估算 FLOPs；
 - 稳定性：smoke 之外至少记录 seed，formal 默认 3 seeds；
 - 恢复：latest/best checkpoint、resume、设备、schema version 和中断原因；
 - 边界：失败原因、未测试项和不能外推的能力。
@@ -46,6 +72,81 @@
 以下指标不能单独判定成功：loss、latent cosine、MSE、单次 answer accuracy、teacher-forced 指标、模型自述或更大参数量。
 
 ## 3. V2-A：推理介质实验
+
+### 3.0 当前 Closure 顺序
+
+历史 A0–A1.21P 与 V2-R1R 现在都作为 Closure 输入，不再各自续跑。活动顺序固定为：
+
+1. **C0R 已完成。**新 production generator identity、visible-pattern oracle、strict compact-trace parser/replay/fault-kill、四臂 public-input 与公平合同均已资格化；旧 v17/C0 roots 不修改。
+2. **旧 C1 与 C1R 均已消费并失败。**旧 C1 停在 G007；C1R fresh answer-only Stage A 停在 G004。二者均 `authorizes=nothing`，不得重跑、补 Gate 或继续调同一 dense core。
+3. **C1S S1 已失败停止。**答案 `32/32` 不能覆盖 recurrence necessity、functional-K 与动态状态 Gate；sealed root 不得重跑、改阈值、换 endpoint 或延长训练。
+4. **C1S S2 与 formal 不运行。**matched K1/K8 discovery 的前置资格没有获得，禁止创建其 root/lease；该旧路线不再恢复。
+5. **Temporal diagnosis 已关闭 Axis C 缺口。**结果证明时序 target、latent motion 与 readout 都存在，故不再继续修 temporal probe；它没有证明 recurrence necessity 或 multi-address。
+6. **C1T S0 是已消费的 predecessor PASS。**真实逐卡 Qwen cache、完整 factorial/no-core 结构量具、target-only transition、source-only forward、CUDA/BF16 与 accounting/seal 均已资格化；它只曾授权 S1 合同设计，不是学习证据。
+7. **C1T S1 已 sealed FAIL。**唯一 fresh Overfit32 完成固定 4,000 updates；no-core necessity 通过，但答案 `22/32`、factorial exact `1/8`，CPS/ERE two-contributor 仅 `8/16` 与 `4/16`，故 R103/R105 失败。sealed root 不得重跑、续训、换 seed、选 checkpoint 或降低 Gate。
+8. **C1T S1 失败归因已关闭主要缺口。**直接机制是 operation-2 dead-gate；上游是完整 factorial hinge 抵消、未 detach counterpart 的跨 cell 耦合和共享多组优化的 mode switch。单组可学对照排除 task/architecture 基础不可表达，但不构成 full-32 修复资格。
+9. **C1U S0 已 sealed PASS。**唯一 preflight/S0 均通过并完整复放；其零训练授权只允许新增 S1 合同与执行层，不是学习或泛化证据，同一 S0 identity 不得重跑。
+10. **C1U S1 已 sealed PASS。**唯一 preflight/formal 均已消费且完整复放，同一 identity 禁止重跑、续训或替换 endpoint；其 S2 合同设计授权已经消费。
+11. **C1U S2 已 sealed FAIL。**唯一 preflight PASS，唯一 formal 完成全部 24,000 steps 后在 fresh-bank absolute behavior、paired K8>K1 与 heldout causal behavior 三门失败；functional address sensitivity 不能覆盖错误方向。旧 identity 禁止重跑、续训、换 seed 或补 Gate，multi-seed 与 S3 不运行。
+12. **后继只形成修复建议，未获授权。**若继续，应以全新 identity 直接切换到 record-local public symbol binder + per-choice shared scorer，先用 zero-training alpha-renaming invariance 与 choice-label equivariance Gate 资格化，再重建 S1→S2 证据链；不得把它叫作 S2 retry。
+
+C0R 的历史授权已经由 C1 消费，不能再次使用。A1.19H 可复用的是 opaque-address/continuous-payload 状态代数、targeted transition 与因果 Gate；A1.20D 可复用的是粗到细双向 Boundary closure。它们不是可直接拼接的旧 checkpoint 或 formal 资格。任何旧 checkpoint、route/family target、旧 K=1 数值或 Pareto smoke 都不得作为 successor 结果输入。
+
+### 3.0.1 V2-A Closure C2：扩展推理介质与融合合同（未来；当前仅设计）
+
+#### 核心判断与阶段边界
+
+C2 不预设所有任务上必须产生一个全局胜者。它先回答六种固定推理介质是否形成可重复、任务条件化的不同 Pareto 区域，再回答一个支付了路由、转换和失败恢复成本的融合体，是否能在未知 heldout episode 上超过最强固定臂。若不同任务确实偏好不同介质，“没有单一全局胜者”是允许的实验结论；但“各有优势”本身不等于融合成功。
+
+本段只更新未来 C2 的活动规划，不授权实现、训练、建 cache、创建 root/lease 或运行 screen/formal。只有 C1U matched learned K1/K8 的全部前置阶段通过，并由新的冻结 successor 合同明确授权 C2 后，才可实施。C0/C0R 的历史四臂合同与 seal 保持原样；它们提供任务、compact trace、public-input、公平性和成本原则，不因这里新增离散臂而被追溯改写为七臂结果。
+
+#### 固定介质矩阵
+
+C2 的第一阶段固定为一个无中间推理介质控制和六个推理介质臂。融合体不与固定臂同时训练，也不计作第八个固定臂。
+
+| 臂 | 中间载体 | 每个 reasoning macro-step | 主评测随机性 |
+| --- | --- | --- | --- |
+| `direct` | 无中间介质 | 直接进入统一最终答案接口 | 无中间采样；最终答案解码与其余臂锁定相同 |
+| `public_ar1` | 人类可读、公开语义 token | 生成一个 categorical distribution，硬采样一个 token；下一步读取已采样历史 | stochastic |
+| `public_block_b` | 人类可读、公开语义 token | 一次前向同时生成 `B` 个位置分布并并行硬采样 `B` 个 token | stochastic |
+| `private_ar1` | 训练中新建的私有 codebook | 生成一个 code distribution，硬采样一个 code；下一步读取已采样历史 | stochastic |
+| `private_block_b` | 训练中新建的私有 codebook | 一次前向同时生成 `B` 个位置分布并并行硬采样 `B` 个 code | stochastic |
+| `latent_k1` | 单个连续向量状态 | 一次确定性 latent transition | deterministic |
+| `latent_k8` | 八槽连续向量状态 | 一次确定性 multi-slot latent transition | deterministic |
+
+`B > 1`，但本计划不提前把 `B` 与 `K=8` 视为等价。`B` 是单次离散发射带宽，`K` 是同时存在的连续状态槽数；主 `B` 必须在 C2 冻结合同中依据 train-side 容量/成本资格预注册，并在查看 heldout/formal 结果前锁定。`B=8` 可以作为对齐候选，但不能因结果更好而事后选择；其他 `B` 只形成标记清楚的容量曲线，不替代主比较。
+
+#### 离散介质的操作定义
+
+“一次一个 token/code”按逐 token 自回归归类：每次只采样一个离散符号，下一次分布明确以此前硬采样结果为条件。“一次多个 token/code”必须是真正的并行块：一次模型前向返回形如 `[B, |V|]` 或 `[B, |C|]` 的位置分布，所有位置在同一采样事件中完成；块内任一已采样值、ground-truth token 或 teacher token 都不得反馈给同块其他位置。块位置 query 可以在产生 logits 前通过同一受限 block core 交互；后续 macro-step 可以读取已经完整结束的前一块。普通 token-by-token `generate` 即使分 chunk 调用仍是自回归，当前 `transport_chunk_tokens` 也不得记作 parallel block。
+
+public language 不是“tokenizer 能打印字符”即可。它必须使用公开 tokenizer/词义或冻结的公开 compact-trace 语义，能被独立 parser 解析、semantic replay，并对 malformed/fault 输入 fail closed。private language 必须使用 fresh、专用的 codebook、embedding 和 categorical head，不继承预训练词嵌入的词义；code ID 虽可显示为编号，但不能据此宣称人类可读。私有臂必须报告 code utilization、dead-code rate、跨 seed code permutation、rename/permutation 等变性和 causal code substitution，证明它学习的是可用的离散内部语言而不是固定位置、答案或 family 标签。
+
+四个离散主臂在正式推理中都必须从冻结的 categorical policy 硬采样，不得用 soft probability-weighted embedding 冒充离散生成。temperature、top-k/top-p、EOS、最大 macro-step、随机数算法和 sampling-seed ledger 必须预注册；模型/data seed 与 sampling seed 分开报告，并给出均值、置信区间、最差 seed 和 failure rate。配对 greedy/argmax 只作为“分布质量 vs 采样噪声”诊断，不增加一个主臂；best-of-N、自洽投票或 rejection sampling 必须另列全部采样成本，不能作为默认主结果。若训练使用 teacher forcing、straight-through、Gumbel 或其他 soft/biased gradient surrogate，训练暴露账本和 estimator 必须冻结，且另设 inference-consistent hard-forward Gate。
+
+#### 公平监督、预算与成本
+
+扩展 C2 继承 C0/C0R 的同一 Qwen revision、tokenizer、`source_text` 唯一 public forward、任务/split/causal pair、teacher source、episode/order ledger、validation 选择频率、最大 optimizer/search budget，以及 equal-example 与 equal-GPU-hour 双 matched slice。最终答案接口、合法答案 mask 和答案解码必须跨臂相同；family、program AST、reasoning budget、teacher trace、claims、route target 和答案不得进入被测 forward。
+
+七臂逐 record 消费同源的 canonical compact trace、target tokens、loss mask 与 exposure ledger。public 离散臂直接预测可验证 trace；direct、private 和 latent 臂使用信息量匹配的 training-only trace decoder/auxiliary head，并在正式评测前物理删除。parallel public block 对同一 trace 只做冻结的分块与 padding mask，块内不得喂入 ground-truth 前缀。dense state/claim supervision 只能作为 `supervision-advantaged` sensitivity，不能进入介质优越性主结论。
+
+除既有双 matched slice 外，C2 还必须报告完整质量—成本曲线和 matched-quality 成本。equal macro-step、equal emitted-symbol 或 `B=K` 只能作为带宽敏感性诊断，不能单独代表公平。成本账本至少覆盖 teacher 生成/验证、Qwen encode/cache、训练 FLOPs、在线前向、vocabulary/codebook logits、硬采样、输出 token/code、block padding、latent transition、KV/activation、peak VRAM、吞吐、median/p95 latency、重采样/失败恢复，以及每次 token/code↔vector 转换；cached latent/private 延迟不得与在线 public generation 直接比较。
+
+#### 从固定臂到融合体
+
+融合测试必须后置，并按“固定臂 → 转换桥 → 路由器”的顺序推进：
+
+1. 先独立训练、选择并封存七个固定臂；任何臂都不得读取 router 或其他臂的 hidden state。
+2. 再资格化显式 typed bridge：public/private token/code→vector 只能通过登记的 embedding + Boundary；vector→public/private 只能通过登记的 categorical head/decoder + 硬采样。bridge 只能读取当前 typed state、位置和允许的公共控制元数据，不能额外读取 raw source、teacher、answer、family 或 oracle budget，也不能扩成第二个隐藏 reasoner。
+3. bridge 必须通过 roundtrip/decision consistency、counterfactual substitution、no-bridge/wrong-bridge、介质 provenance、转换次数和净成本审计。仅有低 reconstruction loss 不算转换资格。
+4. 只有至少两个固定推理臂在预注册任务 strata 上表现出统计支持、非重叠的优势，且离线 diagnostic oracle 在扣除 bridge/router 成本后仍有正上界，才允许训练 learned router。oracle 只用于资格诊断，永远不得进入模型 forward 或最终模型分数。
+5. 先测 episode-level router：每个 episode 只选择一种介质，不做中途切换。它通过后才允许 step-level router 在轨迹中切换介质，并强制经过上述 bridge；不得直接共享未登记 hidden state。router 可以读取允许的 public source representation 和当前状态，但不能读取 family/task 标签、答案、teacher 或 outcome oracle。
+
+融合体必须在计入 router、bridge、额外 cache、转换、失败恢复和所有采样后，超过最强固定臂，而不是超过固定臂平均值；同时报告 worst family/split/seed、router regret、route collapse、转换频率和 route/bridge causal necessity。若一个固定臂在质量—成本上支配其余臂，则保留该臂并停止融合；若固定臂存在条件优势但 learned router 扣费后不能超过最强固定臂，则只允许形成外部静态部署选择，不宣称动态融合成功；若 router 塌缩到单臂，则删除未使用路径，不保留名义融合。
+
+只有固定介质或融合体形成可重复净 Pareto、通过相应介质的因果必要性与审计，并在 private/block/fusion 路线中分别证明 code、并行块、route 和 bridge 不是旁路时，才可成为 V2-A architecture-formal 候选。该资格仍不等于 V2-A PASS，也不授权 V2-B。
+
+下述 3.1–3.4 保留早期 A0–A3 连续分支的实验定义与历史结果；未来 C2 的主比较、离散介质和融合判定以本节为准。
 
 ### 3.1 V2-A0：成熟基座与任务基线
 
@@ -145,8 +246,8 @@
 
 #### 正式配置要求
 
-- 预注册基座、数据、`K/T`、学习率、冻结矩阵和 seeds；
-- 同基座文本 CoT、direct 和 latent 对照；
+- 预注册基座、数据、离散 `B`/codebook 与连续 `K/T`、采样策略、学习率、冻结矩阵和 seeds；
+- 同基座 direct、四个离散介质和 K1/K8 固定臂；若测融合，再加入已资格化 bridge/router；
 - 至少 3 seeds；
 - heldout、长度外推、消融、audit 和成本齐全；
 - 原始文本能力 retention 套件；
@@ -154,14 +255,14 @@
 
 #### V2-A 通过标准
 
-连续 latent recurrence 同时满足：
+C2 资格化的固定介质或融合体同时满足：
 
-1. 无离散隐藏 CoT 和答案旁路；
-2. 最终质量不低于强文本基线，或在同成本下有实质提升；
-3. 在同质量下具有可重复成本优势，或在同成本下具有可重复质量优势；
-4. 多向量容量收益与介质收益被分开报告；
+1. 无合同外隐藏推理、答案旁路、teacher/oracle 泄漏；private code、并行块、route 与 bridge 均按所选路线通过专属审计；
+2. 最终质量不低于最强适用固定基线，或在同成本下有实质提升；
+3. 在同质量下具有可重复成本优势，或在同成本下具有可重复质量优势；融合体必须扣除全部路由与转换开销；
+4. block width、codebook、`K/T` 的容量收益与介质收益、采样收益、路由收益被分开报告；
 5. 成熟文本能力没有不可接受退化；
-6. audit readout 通过因果忠实性 Gate。
+6. public trace、private code、latent trajectory 或融合 provenance 的相应 audit 通过因果忠实性 Gate。
 
 若未通过，停在 V2-A，重做 transition、训练监督、任务或基座；不进入 V2-B。
 
@@ -324,17 +425,123 @@ A1.20D 是 A1.20C 严格失败后的 post-stop diagnostic，不追溯改写旧 G
 
 机器分类 `full_text_hybrid_candidate_confirmed_but_matched_pareto_not_closed`，`a121p_passed=false`、`a122a_authorized=false`。按硬顺序停止，不运行 A1.22A。重新启动 A1.21P 前必须设计真正改变可执行代数或规划结构的新任务族，补齐三组 fresh data/reader/core seeds、公平 baseline 训练合同、每 family 至少 64 条在线评估和完整成本账本。完整记录见 `docs/v2-a1.21p-pareto.md`、`tmp/V2-A1.20D-A1.21P result.md` 与 `artifacts/v2-a/a1_21p/assessment-summary.json`。
 
-### 3.19 V2-R1R：最小跨任务重验证（v2 修订已冻结，P0-D v1 被否决）
+### 3.19 V2-R1R：最小跨任务重验证（P1 v3 停在 K=8 Gate）
 
 当前不再继续完善 COPY/SWAP compiler，也不直接重跑旧 A1.21P。A1.20D 保留为机制正控制；新的 R1R 使用同一共享 Boundary/core 联合验证两个不同任务族：`ERE` 情境规则执行负责单轨长程状态更新，`CPS` 约束计划选择负责并行候选模拟、条件、资源、延迟后果与成本比较。每个 episode 临时定义 nonce 规则/action 语义，禁止固定 operation 枚举和任务专用 transition。
 
-冻结模型为 `Qwen3.5-2B final hidden -> token-wise 2048→512 Boundary -> K=1/8 shared two-layer recurrent core -> latent-only 9-label readout`。Boundary 不做 section/entity/candidate compiler；core 按公开序列长度使用 `T=min(24,L+2)`，两个任务共享全部参数。训练期用共享 claim verifier 从 `H_t` 判断 simulator 生成的真假状态命题，最后 600 update 退火为 answer-only 并物理删除 probe。AST、span、role、entity/candidate state、正确索引和答案都不得进入 model view。
+P0-M 已实现的主模型为 `Qwen3.5-2B final hidden -> token-wise 2048→512 Boundary -> K=8 shared two-layer recurrent core -> latent-only 9-label readout`。Boundary 不做 section/entity/candidate compiler，两个任务共享全部 core 参数。P0-M/v3/v4 的训练期 claim verifier 使用 state–query interaction、真假 pair ranking 与同族 owner contrast；v4 已证明任意跨 episode owner negative 会奖励 nonce 身份记忆，因此 v5 活动目标只保留同 episode paired claim，Gate 后仍物理删除 probe并验证答案逐字节不变。AST、span、role、entity/candidate state、正确索引和答案都不得进入 model view。K=1 尚未在新任务的正式 P1 合同中比较。
 
-P0-D 先以每族 4096/512 完成 simulator、fingerprint、必要因果、hard-negative、heuristic、claim 和禁止字段审计；旧“CoT 必须比 direct 高 0.15”不再作为数据 Gate，因为模型输出策略不是数据属性，该差值移到 P1 实测。P0-D 后只运行 overfit/吞吐 smoke；全部通过才用新的 8192/1024 数据训练 direct SFT、text-CoT SFT、K=1 latent、K=8 latent。P1 同时要求行为、OOD、causal pair、latent intervention、T 截断、aux 剥离和 bypass Gate；P2 每族至少 128 条在线 matched Pareto；P3 才运行三个 fresh generator/Boundary/core seed。
+P0-D 测量链为 R0A–R0D：R0A 只验证 hand-authored semantic oracle 与公共 simulator；R0B 验证 G02–G06；R0C 用已知数值 toy fixtures 验证 G07/G08 statistical learner；R0D 才做完整 integration。v7 的 858-cell lattice 与主审探针关闭 R0A；v9 以固定 profile、独立 typed derivation 和可逆 grammar 关闭 R0B；v10 资格化 source-only parser、条件多数、word/character multinomial NB、grouped CV 与 train-heldout。v11 只组合三层 accepted 实现，以 12 个 case、8 Gate、20 faults、19 raw metrics、4 metamorphic 和 artifact replay 关闭有限 R0D integrated measurement qualification。
+
+v12 已关闭上述两个 entry condition：production renderer 可逆覆盖完整受控 ERE/CPS AST，model view 精确封闭，compact exact scorer 在最长 3,322 characters/984 pinned Qwen tokens 的入口剖面通过。v13 随后完成 1,440-record R1 generator smoke；正式 G01–G11 全 true，claim 局部反事实配平使 heldout word/char NB 全为 0.50，主设计层最终接受固定 seed 的有限 generator smoke。
+
+v14 已完成上述完整 production P0-D 尝试：修复 root provenance、非九整除标签配平、ERE 语义容量与 sparse exact-equivalent audit，并先通过 8,192-record 双运行 preflight。唯一 14,336-record formal 只有 G09 false；两个失败 cell 的 point excess 约 `+0.035/+0.042`，但 98-way simultaneous upper 超 ceiling，所有 14 个 family aggregate 通过。v14 formal 禁止覆盖或重跑。
+
+v15 随后另立 G09 decision/power qualification，并预注册 train 4,096、heldout 1,536。100,000-trial 的 null/local/diffuse 七场景、14 fault、3,264 个 exact 对照、single-bank/batch/progress 与 replay 均通过；但唯一 Q formal 的 Q08 因一次性 speedup `4.7617x < 5x` false，最终 `FAIL_G09_QUALIFICATION`。固定 fresh-seed production root 没有创建。v15 Q artifact 禁止覆盖或重跑，不能用开发期更高速度或事后阈值接受。
+
+v17 已按独立合同完成上述 repair qualification：50,000-seed `if_copy` sweep、13,312-fingerprint capacity、v16 307 条失败回归与 58 项 collision/fault-kill 均通过；fresh seed `2026081702` 的 26,624-record formal 为 G01–G11 全 true，P0-D accepted。P0-M v1–v4 随后依次暴露 cache 判据、BF16 mask/baseline 效率、claim compatibility 与监督时序问题；v5 不降 Gate，以 owner contrast、持续 claim 监督和剥离复载关闭 M01–M08。
+
+P1 v1 随后以 fresh seed `2026081901` 和每族 train `8192`/heldout `1024` 启动；唯一 data formal 只因 `ERE/validation/full_text_char_3_5_nb` 的 simultaneous upper 越线而停止。P1 v2 没有重判 v1，而是先用 100,000-trial Q01–Q09 资格化 train/heldout `8192/4096` 的完整 98/14-cell 测量功效，再以 seed `2026082002` 生成 65,536 records。正式 G01–G11、两次生成、只读 replay、watched inputs 与 12×1024 固定模型子集全部通过；原敏感 cell accuracy/upper 为 `0.29639/0.32034 < 0.37087`。
+
+P1 v2 cache 随后完整生成 28,672-source/191,144-claim、132+26 shards、20,563,413 tokens 的 packed FP16 banks。外层命令在四小时等待上限退出但子进程继续；正式进程在 source 内容审计的 progress callback 中得到 `OSError [Errno 22]`，因此 sealed FAIL。封存后关闭 progress 输出重放同一 full audit，两个 banks 全 entry 通过、`failures=[]`；故障属于 execution telemetry，不是 cache 内容或架构。该历史边界见 `docs/v2-r1r-p1-v2-cache-infrastructure-failure-review.md`。
+
+P1 v3 随后以新合同完成 T01–T06 telemetry decision power 和 R01–R09 immutable cache recovery；两次 full audit 均覆盖全部 entries、canonical 相等，v2 cache 仍保持 formal FAIL，只新增只读训练授权。唯一 K=8 使用 16,384 个 train episodes、38,400 次 episode exposures 完成 2,400 updates，但 validation ERE/CPS 只有 `0.24902/0.19043`，OOD 为 ERE `0.25098–0.29199`、CPS `0.10156–0.16992`，causal flip 为 `0.00391/0`，zero/shuffle/slot-permutation middle 几乎不改变结果；claim accuracy `0.5`、owner-shuffle drop `-0.00195`。K01–K06 false、K07/K09 true；K08 另有 batch-size 写死的非决定性审计误报。正式状态 `FAIL_P1_K8`，后序 roots 全未创建。
+
+训练吞吐为 `191.66 examples/s`、`107,205 tokens/s`，GPU 利用率中位数 `56%`，排除此前低功率基础设施主因。首要合同缺陷是暴露预算没有随数据规模扩展：平均每条 episode 仅 `2.34375` 次，每次只抽 4 个 claim，153,600 次 claim 观察少于 191,144 个唯一训练 claim。下一步只能另立 P1-LQ/P1 v4 training-qualification，以 data scale × exposure ratio 先判断预算与可扩展性，再在必要时比较等计算的 joint-from-start 与 mechanism-warm-start；不得重跑 v3 或进入 P2。完整复核见 `docs/v2-r1r-p1-v3-k8-failure-review.md`。
+
+### 3.20 V2-R1R P1 v4-LQ：机制启动通过，规模扩展因身份记忆失败
+
+P1 v4-LQ 不修改 K=8 架构，也不降低原 K01–K09。B128 在 update 1,200 通过；S512 跑满 4,800 updates 后训练 answer 为 `1.0/1.0`、claim `0.9629`，但 validation 为 `0.2344/0.1885`，正式 Gate 失败并停止。S2048/F8192/assessment 未创建。
+
+只读诊断进一步显示，S512 checkpoint 在见过 episodes 上 claim `0.939/0.965`，在同分布未见 episodes 上为 `0.498/0.506`；zero-state/zero-claim 约 `0.5`。因此不是 claim-only 泄漏，而是 source–claim 联合身份记忆。跨 episode owner-contrast 的真值未定义，却被训练与 Gate 当作负例；该目标和 Gate 已被 v5 直接删除。完整复盘见 `docs/v2-r1r-p1-v4-lq-failure-review.md`。
+
+### 3.21 V2-R1R P1 v5：静态 paired claim 规模迁移失败
+
+v5 不改部署模型，只删除错误 owner negative 并引入 7,168/1,024 optimization-audit。唯一 Q7168 跑满 14,336 updates 后，训练 answer ERE/CPS 为 `1.0/1.0`，隔离 audit answer 为 `0.4746/0.1846`，claim 为 `0.5/0.5`，state-dependency drop 为 `0/-0.0034`，因此 sealed FAIL；F8192/assessment 不存在。梯度、参数移动与小规模可学习性排除了断图，根因是静态平衡 predicate 在形成 predicate-state binding 前梯度相互抵消。完整复盘见 `docs/v2-r1r-p1-v5-semantic-transfer-failure-review.md`。
+
+### 3.22 V2-R1R P1 v6/v6R：causal temporal witness 机制资格已恢复
+
+v6 比较等 source batch、等四个 query-state judgments、同初始化与同 schedule 的 `static_pair` 和 `temporal_witness`。temporal 用同一 prefix-free query 在相邻 T+1 latent states 上提供相反真值；模型仍只见 source hidden、匿名 K=8 workspace、budget 与 choice mask，不见 AST、oracle span、canonical state 或显式寄存器。两臂固定 3,200 updates；checkpoint 只按 optimization seen 选择，128/族 fresh formal audit 只评估一次。Gate 为 seen 每族 `0.70`、audit 每族 `0.65`、audit state drop 每族 `0.10`，temporal 另需 swapped-state drop 每族 `0.20` 和相对 static audit 优势每族 `0.10`。
+
+formal 的 witness/query/mechanism-compare 前四阶段均 sealed PASS：510,401 witnesses 全部重放，query cache 为 18,899 queries；static audit ERE/CPS 为 `0.4805/0.4868` 且 state drop 近零，temporal audit 为 `0.7058/0.8053`、state drop `0.2058/0.3053`、swap drop `0.4117/0.6105`，预注册选择 temporal。原 assessment 唯一 W604 false 是 `reasoning_budgets` 的六个 integer keys 经 JSON 写盘后转 string，而代码错误使用 raw Python equality。
+
+v6R 保留原 FAIL 和五个旧 roots，以两个新 roots完成 canonical/hash independent replay、三类 selection mutation 负控和 18,899/18,899 query content audit；R601–R610 全 true，正式 `PASS_P1_V6R_SELECTION_RECOVERY`。设计、失败复核与主审见 `docs/v2-r1r-p1-v6r-selection-recovery-design.md`、`docs/v2-r1r-p1-v6-ctw-assessment-failure-review.md`、`docs/v2-r1r-p1-v6r-selection-recovery-main-review.md`。
+
+### 3.23 V2-R1R P1 v7 integrated K=8：时序机制保留，CPS 因果答案失败
+
+v7 使用新 model/order/selection seed，不续训 v6 comparator checkpoint。在 full 8,192/族上，每个 episode 40 次 exposure；preflight 与 86,016-query cache sealed PASS，唯一 K=8 跑满 20,480 updates。validation ERE/CPS 为 `0.999023/0.851562`；temporal accuracy `0.766357/0.938965`、zero drop `0.266357/0.438965`、swap drop `0.532715/0.877930`，batch-shuffle-middle 平均答案 drop `0.627441`，说明 recurrent state 与 v6R 机制均真实参与。
+
+失败集中在答案语义：CPS composition/horizon/distractor/language 为 `0.587891/0.754883/0.472656/0.214844`。正式 evaluator 错把数据的 `base/flip` 要求成 `base/counterfactual`；父任务只读修正后 pair flip 为 ERE/CPS `0.705078/0.0078125`，所以 bug 没有隐藏 PASS。共享梯度近正交、K10 强而 CPS causal 近零，支持“temporal 与 answer 在 final state 中形成两条通路，ordinary CE 没把决策绑定到因果变量”的归因。
+
+K04 zero-middle 在每一步仍可读取完整 source，测到的是可恢复性而非 state 必要性；K06 强制 T1 drop 也不属于白皮书必要条件，应转成质量—成本控制。两项保持 v7 历史结果，但不进入后继资格 Gate。三个 v7 roots 均封存，K=1/baselines/P2 未运行。完整边界见 `docs/v2-r1r-p1-v7-integrated-k8-failure-review.md`。
+
+### 3.24 V2-R1R P1 v8 causal-bridge：正式失败与合同归因
+
+v8 不扩大 ordinary 训练。每族 512 个旧 causal pair 按 label-blind hash 划为 384 optimization + 128 sealed audit；ordinary arm 另取 768 train records/族。`ordinary`、`causal_unpaired`、`causal_paired` 三臂使用同一初始化、K=8 模型、batch32、3,072 updates 与每条 record 精确 64 次 exposure。paired 臂只额外使用同对配批和 final-logit 双向 ranking，pair/role 不进入模型前向。
+
+每臂先 768 updates temporal-only，再 2,304 updates 联训；optimization 每 episode 统一取 3 个 witness，audit 取 2 个，共 10,240 个 query。三种长度分桶 schedule padding efficiency 为 `0.88313/0.88783/0.88862`。普通 validation/OOD 使用 256 条诊断子集；batch-shuffle 使用完整 1,024 条 length/horizon 同 cohort 对照，预测有效覆盖为 ERE/CPS `1.0/0.99609`。
+
+B01–B07 要求 causal pair 结构、两族 pair flip `>=0.65`、raw accuracy `>=0.75`、temporal persistence、validation retention、batch-shuffle state dependence、probe strip/architecture/compute 全部成立；被选 causal arm还必须相对 ordinary 两族各提升 `>=0.15`。正式运行中 preflight/query-cache PASS，qualification sealed `FAIL_P1_V8_CAUSAL_BRIDGE`：三臂 B01/B04/B07 true，B02/B03/B05/B06 false，没有 selected arm。
+
+ordinary 臂训练复评 ERE/CPS 为 `1.0/1.0`，validation 仅 `0.25/0.1758`。causal-paired 在 optimization pair 上为 ERE/CPS `0.9974/0.5807`，相对 unpaired 的 `0.9245/0.1458` 证明 pair loss 可优化；development audit 却只有 `0.0859/0.0078`。v8 因而暴露的是覆盖与训练路径错误：它只用 v7 约 9.4% 的独立 ordinary 覆盖，causal 臂又完全没有 ordinary pretrain/rehearsal。完整复核见 `docs/v2-r1r-p1-v8-causal-bridge-failure-review.md`。
+
+### 3.25 V2-R1R P1 v8R causal curriculum：共享能力起点的最小恢复合同
+
+v8R 从 sealed v7 checkpoint 出发，`replay_ce` 与 `replay_pair` 读取完全相同的 mixed batch。每批包含 ordinary ERE/CPS 各 8 条、causal ERE/CPS 各 4 个完整 pair；3,072 updates 使完整 ordinary train 每条精确 3 次、v8 causal optimization 每条精确 32 次。两个臂唯一差异是 pair loss 权重 `0/1`，不再训练 temporal probe。
+
+R01–R06 检查共同起点、同初始化/同 schedule/exact compute、CPS optimization decision power、已揭示 audit 上的 transfer、ordinary retention 与架构完整性。PASS 只授权从未进入 v7/v8 model-view 的 1,536 unused pair/族建立 fresh P1 v9；FAIL 则根据 R03/R04 分离 loss 无效与语义迁移无效。P1/P2 均不因此完成。
+
+正式 preflight sealed PASS，qualification sealed `FAIL_P1_V8R_CAUSAL_CURRICULUM`。`replay_pair` optimization ERE/CPS pair 为 `0.9948/0.3281`，audit 为 `0.8047/0.0078`，validation 为 `0.9990/0.7480`；R01/R02 true，R03–R06 false。CPS audit 中 69/128 对沿用 base 答案，只有 1 对正确切换。paired loss 可在训练 pair 上提高 margin，却没有形成跨 pair 的最终比较算法。原 R06 的 ERE source gradient 为零另被 FP32 重测确认为 BF16 饱和下溢，不能替真实 causal failure 背书。完整复核见 `docs/v2-r1r-p1-v8r-causal-curriculum-failure-review.md`。
+
+### 3.26 V2-R1R P1 v8D causal-decision witness：最终决策状态闭合
+
+v8D 继续从 sealed v7 stripped checkpoint 开始，不继承 v8/v8R 训练权重。训练期重新实例化共享 probe，对同一 base/flip 的 `H_T` 提出相同、真值相反的 final-decision query：ERE/CPS 都监督局部答案标签；CPS 额外监督 unique optimum 与 winner/alternate cost ordering。query 只进入 probe，不进入 recurrent core 或答案头；正式答案评估前物理删除 probe并 strict reload。
+
+先用 384 updates probe-only 判定旧 V7 `H_T` 的可解码性，再以 3,072 updates joint state formation 训练 Boundary/core；前 2,560 updates 冻结 answer readout，最后 512 updates 才允许对齐。D01–D07 分别检查输入/query 真值、精确计算、audit decision-state transfer、answer causal transfer、ordinary retention、probe strip/FP32 gradient/部署完整性和停止边界。使用已揭示 v8 split，因此 PASS 只授权 fresh-seed P1 v9；D03 通过而 D04 失败才允许 addressable readout，D03 失败则回到 state formation/Boundary 设计，不再调同类 loss/exposure。
+
+正式 preflight/query-cache PASS，qualification sealed FAIL。joint audit decision ERE/CPS 为 `0.8887/0.5143`，CPS zero/swapped drop `0.0143/0.0286`；answer audit ERE raw/pair `0.8984/0.7969`，CPS `0.375/0`，ordinary retention 通过。只读 state-path 诊断显示 CPS delta 经 Boundary 保留并在 v8D `H_T` 放大，故根因不是 source blindness，而是 episode-specific delta 没有归约成可迁移的 cost/order/choice algebra。
+
+### 3.27 V2-R1R P1 v8L fixed-anchor causal-state ladder：正式 FAIL 与 K=8 停止判据
+
+v8L 从 sealed V7 stripped checkpoint 重启并移除 ClaimProbe。simulator teacher 只生成 mutation-aligned 的 state index 与互斥语义 claim；冻结 Qwen + 冻结 V7 Boundary 编码 query 后，以与 truth label 无关的 hash 顺序构造 `normalize(q_left-q_right)`。这避免 v8L 初稿中正反自然语言 query cosine `0.96–0.996` 导致的梯度抵消，也不在 cache 中拟合 audit statistics。
+
+正式 preflight 与 anchor-cache sealed PASS，qualification 在 384-update bootstrap sealed `FAIL_P1_V8L_BOOTSTRAP`。ERE optimization/audit direction 为 `0.7726/0.7109`，CPS 为 `0.5682/0.5281`；CPS 五层 optimization 均低于 `0.65`，因此 3,072-update joint、答案 Gate 与 retention Gate 均未运行。预注册 fail-stop 已执行：不延长训练、不降低阈值、不建立 v8 后继，也不授权 fresh-seed P1 v9。
+
+post-stop 分层 geometry 审计同时发现 measurement 缺口：global effective rank `25.61` 掩盖了 CPS cost-trace/final-cost 只有 `3.47/3.84`，重定向后的数值 shared-axis alignment 只有 `0.340/0.380` 且含反向方向。故该结果关闭的是匿名 K=8 与 lexical metric teacher 的组合，不能单独否证 mixed core 或白皮书。若继续项目，必须先另立数值/关系 teacher decision-power qualification，再在新架构合同中比较 shared core 与 task-independent mixed/typed core；不得把这个工作命名为 v8 修复。
 
 若 ERE 通过而 CPS 失败，则只证明状态执行器；若两者可运行但没有 Pareto，则终止 V2 多模态主线；若 K=1 支配 K=8，则删除多 slot 复杂度。完整生成算法、张量结构、loss schedule、CLI、成本和停止规则见 `docs/v2-r1-revalidation-task-design.md`，执行 agent 不得自行修改。
 
-P0-D v1 于 2026-08-01 生成每族 train 4096、validation 512、五个规定 OOD/causal split 各 512，旧审计器自判十项为 `true`；主设计层复核随后证明该 conjunction 漏掉关系型位置捷径与监督真值，故当前判定为失败。旧结果见 `docs/v2-r1r-p0-result.md` 和 `artifacts/v2-r1r/p0-v1/`，只保留作 rejected diagnostic。第 16 节已冻结 generator v2、真实 Qwen tokenizer、candidate/action 随机化、ERE 多事件必要性、composition/language 独立性、claim truth 与结构化 heuristic 等 13 项新 conjunction。本轮仍未启动 P0-M、Qwen hidden cache、Boundary/core 或任何 GPU 训练。
+### 3.28 V2-R1R P1-NR1→H1→F1：历史路线（已由 Closure 覆盖）
+
+本路线不建立 P1 v9，也不继承或补跑 V8L。NR1 先资格化没有 answer/label/task id/oracle state 字段的 typed numeric/relation measurement system：numeric 使用迭代累计与 strict-min decision，relation 使用 fixed-point closure；独立 oracle 分别使用 `itertools.accumulate` 与逐 source/query BFS。另有 6+6 个手算 case 与 11 类固定 fault target 的外部 fixture，避免 generator/reference/measurement 同链自证。qualification/heldout 固定为 numeric `384/256`、relation `384/256`；heldout 在 magnitude、horizon、candidate/handle cardinality 上严格超出 qualification，relation corpus 同时强制 branch/merge/multiple-path/multiple-component/redundant-edge 与可变 query 真值布局。
+
+NR1 的 N01–N07 要求 V8L 三根 seal 不变、合同/source/Git/snapshot identity、活动预测试、numeric/relation exact、复杂拓扑、平移/缩放/置换/rename metamorphic、11 类 fault 的预注册 metric/decision kill、fingerprint zero-overlap、唯一 formal 进程树、固定 transport、两根即时复验 evidence seal 与 H1/F1/v9/P2 absence 全部通过。CLI 只暴露 `run-p1-nr1`；formal 前两根 fixed root 与 fixed transport 必须不存在。PASS 只授权 H1 设计，不能把 measurement-system success 写成模型、mixed core 或 P1 success。
+
+该历史合同原规定 H1 获准后比较 anonymous shared core 与 learned/content-routed mixed/typed core，再由 F1 补齐 K=8/K=1/direct/text-CoT。实际 H1 与其 WD 后继均未获授权，当前不再为它设计 successor；Closure C0→C1→C2→C3 已取代其活动地位。以下数值与停线记录仅用于追溯，不是当前执行入口。
+
+2026-08-17，NR1 唯一 formal 已完成：preflight/qualification 分别为 `PASS_P1_NR1_PREFLIGHT` 与 `PASS_P1_NR1_MEASUREMENT_QUALIFICATION`，seals 为 `1825282B…95DAF`、`DADBDDBF…F6FB3`。N01–N07 全 true，source identity 为 `1D837A0F…B78657E`，后继根与残留进程为空；状态只升级为 `p1_h1_design_authorized=true`。下一动作是冻结 H1，而不是重跑 NR1 或直接进入 F1。
+
+同日 H1 development 先后否决三个非正式结构。完整-transition experts 的 heldout 总增益仅 `+0.00684`；纠正为公共 attention 后，互斥完整 FFN screen 虽使 numeric 提高 `+0.12109`，却令 relation 回退 `-0.06055`，总增益 `+0.03027` 且 95% CI 跨零，route flip drop `0.05371` 也未到 `0.10`。第三个 2:1 shared+routed residual 在 current-fingerprint fresh cache 上使总增益升到 `+0.12695`、CI 下界 `+0.09375`，numeric/relation 都为正，但 registered route effect 最大只有 `0.08887`，仍被 H06 否决。三者都不消耗 formal roots，也不授权 F1。等分公共 `H=384` FFN + `H=384` 路由 residual 随后在同 screen seed 跑满 2,400 updates，heldout 总增益 `+0.13867`、CI `[0.10352,0.17285]`，route answer drop `0.13672`，方向 Gate 通过；但预登记全新 `2026081793/2026081794` 独立 calibration 在新 seed 上跑满正式全预算 4,000 updates 后只有 overall `-0.00098`、CI `[-0.03613,0.03516]`、numeric/relation `+0.03125/-0.03320`，最大 route effect `0.03845`。两轮同时改变 seed 与预算，不能纯归因于 seed；calibration 两臂最终 train answer loss 均低于 `0.001`，说明 screen 的 mixed 优势至少含 shared 收敛暂态。calibration `authorizes=nothing`，secondary-floor proposal 无效。进一步复核发现旧 H06 只要求 wrong-route effect，无法排除“错误 expert 有害、正确条件分支却可绕过”：screen 关闭整条 FFN 的 answer drop 约 `-0.00195`。因此活动实现直接切换为共享 `D->H` SwiGLU features + route-selected `H->D` projection，不保留旧 residual expert；旧 `2026081791/1793` 数据身份永久进入 formal 禁用注册表。新 `2026081761/2026081762` screen 从起点固定 4,000 updates，并同时要求 H05、wrong-route `>=0.10`、`disable_routed_projection >=0.05`。
+
+该 factorized screen 已使用预登记 package identity `A52C5222…486DA4` 正常完成，两臂各 4,000 updates，fresh cache、架构、matched active FLOPs、shared no-op、strip/reload、source 与 recurrence 因果检查均通过。heldout shared/mixed 为 `0.55469/0.54395`，overall gain `-0.01074`、CI `[-0.04199,0.01953]`，numeric 回退 `-0.03516`；最大 wrong-route effect 只有 `0.00281`，`disable_routed_projection` 最大效应只有 `0.00781`。H05、wrong-route H06 与 conditional-write necessity 同时失败，机器结果为 `passed=false`、`authorizes=nothing`。因此 `2026081763/2026081764` calibration、H1 formal roots 与 transport 均保持不存在；当前 factorized 方向关闭，不得重跑、换 seed、降低 Gate、冻结 secondary floors 或启动 formal。完整复核见 `artifacts/v2-r1r/p1-h1-nonformal-factorized-routed-projection-screen-20260817-1/SCREEN_REVIEW.md`。
+
+2026-08-21 经用户明确授权，另立 `H1-WD` 非正式机制 screen；它不续跑旧 H1，而以旧 mixed deployment checkpoint 为只读 predecessor，保留 shared FFN 和 routed projection 两条单模型路径。预审在 heldout/train predecessor trajectory 上测得 common/projection 平均余弦约 `0.46`、正向重合 common 能量约 `0.23`，因此 W 阶段只把该正向重合分量写入 projection，D 阶段用冻结 `C0-(PW-P0)` target 残差化 shared FFN，禁止 projection-only。J 阶段与 untouched checkpoint 做同 schedule continuation；family 仅用于结果分层，不进入 W/D/J target。固定 root、预算、Gate 和边界见 `docs/v2-r1r-p1-h1-wd-overlap-residual-design.md`；该 screen 无论结果均 `authorizes=nothing`。
+
+该唯一运行已正常完成并判为 `FAIL_H1_WD_NONFORMAL_MECHANISM`。W/D 的拟合与函数保持成立：W heldout nMSE `0.00196`，D common/total-transition nMSE `0.01393/0.00316`，D free-rollout prediction agreement `0.99121`，common residual energy `0.71348`。J 后 WD/control heldout 为 `0.54785/0.54297`，净增益 `+0.00488`、paired 95% CI `[-0.00195,0.01172]`，未达到 `+0.05`。最终 common-off/projection-off drop 均为 `0.01172`；projection effect 相对 predecessor 的 `0.00781` 仅增加 `0.00391`，故 `common_remains_necessary=false`、`projection_effect_increased=false`。这证明欧氏输出重合可以被无 family target 地搬运并近似守恒，但不能把“重合方向”解释为任务关键能力，也没有产生互补分工。该 root 已消耗，禁止重跑、调 coefficient 或降低 Gate；完整归因见 `docs/v2-r1r-p1-h1-wd-failure-review.md`。
+
+用户随后授权一个隔离的 decision-causal screen，直接修正上一轮“可转移分量”的定义而不修补旧 root。新 target 的幅度来自固定 route 下真实 common-off answer-margin drop，方向来自 selected projection output 的 scalar VJP/Fisher；train/heldout target 按 microbatch `4` 固化为无 family/task target 的 CPU 数据集。W 检查 `P-P0` 是否拟合 `±ΔP`，D 从 common 删除 W 实际写入量，J 用 ordinary answer CE 与 two-path causal-target allocation lock 保持分工，不使用 teacher logits、route supervision 或 family CE。负 VJP matched control 只回答“方向是否重要”，不能证明 shared+routed 相对 shared-only 的架构收益。冻结合同与唯一命令见 `docs/v2-r1r-p1-h1-wd-decision-causal-{design,execution-command}.md`；结果无论 PASS/FAIL 均不授权 H1 formal、F1 或 P2。
+
+该唯一运行已以 `FAIL_WD_DECISION_CAUSAL_WRITE_FIT` 正常 fail-stop。target Gate 全部通过：train/heldout positive fraction `0.97900/0.57715`、realized/request `0.85606/0.93106`、GPU peak `0.32335 GB`。W 两臂各完成 800 updates，但 causal/control heldout transfer-nMSE 为 `1.00450/0.99247`，而 transfer 只占完整 target energy 约 `0.468%`；因此旧式 full-target nMSE 约 `0.0047` 实际是零学习假象。D/J、干预、Shapley 与方向收益均未执行，不能归因于 J 奖励不足，也没有形成架构结论。当前 root 禁止重跑；若未来另立研究，必须先用 projection-parameter Jacobian/Fisher 资格化跨记录共同可达的 `J_θ(x)Δθ`，不能再次把 raw per-record output VJP 直接当作可写入分量。完整复盘见 `docs/v2-r1r-p1-h1-wd-decision-causal-failure-review.md`。
+
+为执行上述可达性诊断，2026-08-23 冻结了独立 R0–R4 screen：R0/R1 分别测 global 与二元 route centroid，R2 只用 target 构造前冻结状态，R3 用跨记录共享的 projection-parameter Jacobian/Fisher，R4 用 unrestricted/within-route permutation、route-conditional sign、谱与 split-half 等注册 null。唯一真实运行完成 train 4096 与 heldout 1024 的 replay 后，在任何 R2 fit、R3 解或 R4 null 前以 `CRASH_NONFORMAL_H1_WD_DIRECTION_GEOMETRY` fail-closed。旧 target bank 由 microbatch `4` 物化，新 capture batch 为 `128`；不同 CUDA reduction/kernel geometry 使 common/projection 尾部最大漂移达到 `7.96914e-05/9.50396e-05`，超过冻结绝对容差 `2.5e-05`。首批 batch-128 spot check 与 batch-4 integration smoke 都未覆盖这一全 split 最坏值。这是执行合同与 preflight 覆盖失败，不是 R0–R4 假设反证；无 `result.json`，也不能把内存中构造但未封存的 R0/R1 centroid 当作结果。root 已消耗且 `rerun_authorized=false`，完整终局见 `docs/v2-r1r-h1-wd-direction-geometry-screen-failure-review.md`。
+
+v2 successor 随后以 sibling exclusive lease、pre-root 全量 batch-4 replay 与 active-site/dual-sketch 控制直接切换，唯一运行完整产出 R1–R4。正确 route pairing 的 permutation `p=9.999e-05`，但 route heldout increment 为 `-0.586%`；projection trunk heldout `+3.189%` 的 record/site CI 均跨零且只 `2/4` lambda 为正；exact shared head `-0.334%`，sampled local-J `-5.922%` 且 CG/finite-difference fidelity 不足。R4 两套 sketch 的 global/route resultant 均拒绝 registered null，所以 residual 不是纯随机兼容，但 spectrum/alignment 的 1024 次 null 无法达到 `0.01/12` 的离散 p 分辨率，终态保守写 `unexplained_under_this_screen`。更关键的是 target-positive prevalence 从 train `4010/4096` 降到 heldout `591/1024`；在 positive heldout 子集上 route absolute gain 仍为 `+6.619%`，整体负 gain 来自大量 no-write 记录的系统性误写。故后继研究应先解决 target-before write gate 与 split shift，不得把当前结果当作加强 projection 训练或“先写后删”的授权。完整终局见 `docs/v2-r1r-h1-wd-direction-geometry-v2-result-review.md`。
+
+P0-D v1 于 2026-08-01 生成每族 train 4096、validation 512、五个规定 OOD/causal split 各 512，旧审计器自判十项为 `true`；主设计层复核随后证明该 conjunction 漏掉关系型位置捷径与监督真值，故当前判定为失败。旧结果见 `docs/v2-r1r-p0-result.md` 和 `artifacts/v2-r1r/p0-v1/`，只保留作 rejected diagnostic。第 16 节已冻结 generator v2、真实 Qwen tokenizer、candidate/action 随机化、ERE 多事件必要性、composition/language 独立性、claim truth 与结构化 heuristic 等 13 项新 conjunction。v2 已使用 seed `20260801` 完成 smoke（13/13 true）和正式规模生成；独立 formal audit 的 13 项中 10 项 true、3 项 false：CPS horizon action-definition position grouped deviation `1.0`，CPS distractor/horizon 缺少 required claim kinds，CPS causal/horizon `longest_plan` heuristic 分别为 `0.310546875/0.2734375`。主设计层独立验收还复现了只数 action definition 即达 `0.83203125` 的 horizon source-only shortcut，确认 ERE length OOD provenance 占比 `1.0`、CPS train/validation 正确计划仅长 1/2，以及多个 heuristic/heldout/claim/provenance Gate 尚未真实实现。正式证据保留于 `artifacts/v2-r1r/p0-v2-failed-audit-20260801-1/`，详细复核见 `docs/v2-r1r-p0-v2-main-review.md`；本轮按规则停止，未启动 P0-M、Qwen hidden cache、Boundary/core 或任何 GPU 训练。
+
+旧 v3 合同曾要求 15-Gate ledger、F01–F15、ERE 五类 provenance/逐样本必要性、CPS 依赖图 hard negative、分层 surface assignment、claim 和 source snapshot。2026-08-01 执行层 machine D0/D1 通过，唯一 D2 `artifacts/v2-r1r/p0-preflight-v3-20260801-1/` 输出 `G01–G04、G09、G10、G12、G14、G15=true`、`G05、G06、G07、G08、G11、G13=false`，随后严格停止。主设计层接受该失败 artifact 与停止纪律，但拒绝 v3 实现：G07/G08 读取不存在的 family aggregate 而恒假，D0 只有负向 fault 没有 known-good 全 conjunction；G06/G08/G13/G15 低于冻结合同；CPS 仍围绕固定五角色候选骨架，non-NONE hard-negative、较长 valid-suboptimal、四类 claim 和位置配额大面积不满足；post-run 文档同步还会让 fresh G03/G15 自失效。旧合同与命令只保存在 D2 source snapshot，完整证据见 `docs/v2-r1r-p0-v3-main-review.md`。
+
+v4/v5/v6 的失败与 sealed artifact 均保留追溯；v6 的 14/4/12/245 窄事实有效，但 query placeholder 十项主审反例证明 coarse coverage tag 不足。v7 不修补 v6：它另立 slot × scope × token 规范并在唯一 formal 得到 508/508 invalid、350/350 acceptance、858/858 coverage；父任务 27/27 新鲜探针通过，R0A 正式 accepted。v8 的机器矩阵、seal 和协议事实有效，但五项 fresh probes 全部错误通过，R0B 主审 rejected；v9/v10/v11 分别接受有限 R0B/R0C/R0D；v12/v13 接受 production entry/generator smoke，v14–v16 保留各自失败或窄组件身份，v17 正式关闭 P0-D，P0-M v5 正式关闭训练通路 smoke。完整合同与判决见各版 design、execution 与 main-review。所有 fixed formal 均停止且不可重跑；只有另立 P1 合同后才可进入泛化验证。
 
 ## 4. V2-B：静态多模态与双层 MoE
 
@@ -447,8 +654,9 @@ V2-C 只有在 V2-A 与 V2-B 正式通过后启动。完整合同见 [`v2-c-hier
 19. A1.20C 分层 compiler × straight-through 修复已完成监督审计、实现、smoke、目标臂 fixed-5000 overfit32 与实际 checkpoint 梯度审计；目标臂 strict Gate 失败；
 20. A1.20D post-stop 机制修复已完成：双向三遍 section decode 修复 N5 截断，canonical 完整 split matrix、hidden causal 与三个 routing schedule probe 均通过放宽机制门，但不是 fresh-seed formal；
 21. A1.21P 已完成 K=1 负基线、两个在线五条 smoke、路径稳定性和机器 assessment；六项正式合同缺口使 `a121p_passed=false`，A1.22A 与 V2-B0 保持停止。
-22. 已完成 V2-R1R 主设计层冻结和 P0-D v1 独立 package；旧机器 10/10 已因结构化捷径、错误 claim 和 split/audit 缺口被主设计层否决。v2 修订合同已冻结，当前仍未实现或运行 Qwen hidden Boundary、共享 latent core、四条公平 baseline、P0-M/P1/P2/P3 和成本账本，路线停在 P0-D 重做。
-23. 已完成 V2-C 统一系统实验设计：旧 A1-A4 目标已聚合为 C0-C5；当前没有运行时、工具接入、数据、代码、训练或 formal artifact，且不改变 V2-R1R 的当前优先级。
+22. 已完成 V2-R1R 高层合同、P0-D v1–v17、P0-M v1–v5 与 P1 v3–v8L 闭环。v6/v6R 已资格化 temporal mechanism；v7 证明该机制和 episode-specific state dependence 可扩展到 full-data 联训，但 CPS causal/OOD 失败；v8R 排除 scratch/coverage，v8D 排除 source/Boundary blindness，v8L 则在 ERE 通过、CPS bootstrap 失败且 lexical numeric teacher 未充分资格化处执行最终停线。K=1、baselines、完整 P1 与 P2/P3 均未运行。
+23. P1-NR1 已在独立主审后完成唯一 formal：手工预期、复杂 DAG、oracle-target fault registry、known-handle state 与 fail-closed runner 的 N01–N07 全 true，两根 roots 与 transport 已消耗。状态只授权 H1 设计，不能跳到 F1/P2。
+24. 已完成 V2-C 统一系统实验设计：旧 A1-A4 目标已聚合为 C0-C5；当前没有运行时、工具接入、数据、代码、训练或 formal artifact，且不改变 V2-R1R 的当前优先级。
 
 当前已有 A1.8 structured core 到 T24、A1.9 oracle-role-segmented frozen Qwen hidden boundary、A1.10–A1.17 分层失败归因、A1.18B TSAUX 训练机制闭环，以及 A1.19H generalized hybrid core 的多 seed formal/causal artifact。A1.20D 又证明 full-text entity/program compiler 必须双向闭合 section boundary；修复后 canonical N5、长程、relation 与 hidden causal 均形成强诊断正证据，说明当前 hybrid mechanism 已值得继续。可是 learned full-text Boundary 的三组 fresh formal、matched Pareto 与完整 V2-A formal artifact 仍不存在。不得把 A1.20D 单起点诊断、routing 表面改写或五条在线 smoke 写成 A1.21P/V2-A 通过。
 
@@ -483,3 +691,4 @@ V2-C 只有在 V2-A 与 V2-B 正式通过后启动。完整合同见 [`v2-c-hier
 27. A1.21P 当前最危险的假阳性来自 baseline 不公平与任务同构：五条 smoke、canonical demonstrations 和 COPY/SWAP 表面改写都可能夸大 hybrid 优势。下一轮不得只增加 routing 样本，必须先建立新可执行代数和 matched training/teacher 合同。
 28. R1R 不要求模型从 final loss 自行发明地址、mask、预算或信用分配；这些由代码或训练脚手架提供。禁止的不是工程结构，而是推理时 oracle/答案旁路和在模型内硬编码任务语义。
 29. R1R 的目标是最小充分证伪，不是把一个切面做到 `1.0`。内部 trajectory exact 降为诊断，正式结论看跨任务行为、因果、最差 seed 和 matched 质量—成本。
+30. v6 证明粗粒度 coverage tag 不能替代语义位置的组合覆盖。后继 validator 合同若获准，必须机械枚举 schema 位置 × reserved token × API，并继续保留合同外新鲜探针；不能因 frozen matrix `245/245` 就推断书面不变量完备。

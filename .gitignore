@@ -11,3 +11,6 @@ thinking
 archive
 .codex/
 tmp.txt
+/tmp/
+/AGENT.md
+*.egg-info/

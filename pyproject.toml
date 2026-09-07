@@ -9,6 +9,7 @@ description = "Project-Yggdrasil V2 architecture-fidelity experiments"
 requires-python = ">=3.11"
 dependencies = [
   "huggingface-hub>=1.5,<2",
+  "numpy>=2.4.6,<3",
   "safetensors>=0.4",
   "torch>=2.6",
   "transformers>=5.13.1,<6",
@@ -17,10 +18,18 @@ dependencies = [
 [project.optional-dependencies]
 test = ["pytest>=8"]
 
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu130" }
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
-addopts = "-q"
+addopts = "-q --import-mode=importlib"
 testpaths = ["tests"]
 pythonpath = ["src"]

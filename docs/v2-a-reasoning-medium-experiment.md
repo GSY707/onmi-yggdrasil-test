@@ -237,7 +237,7 @@ masked state-supervision probe 位于 `k8-t8-mlp-source-mean-state-supervision-m
 
 ## 5. A1.5 分层正控制续实验
 
-A1.5 不沿用旧 v4 数据或旧 A2 的 K/T 结论，而是以独立 schema `yggdrasil.v2-a1.5.symbolic-state-machine.v1` 重新检查必要步骤、operation span、逐步 state 和组合 heldout。完整命令、artifact、干预和问题因果链见 [`docs/v2-a1.5-latent-foundation.md`](v2-a1.5-latent-foundation.md) 与 [`tmp/V2-A1.5 result.md`](../tmp/V2-A1.5%20result.md)。
+A1.5 不沿用旧 v4 数据或旧 A2 的 K/T 结论，而是以独立 schema `yggdrasil.v2-a1.5.symbolic-state-machine.v1` 重新检查必要步骤、operation span、逐步 state 和组合 heldout。完整命令、artifact、干预和问题因果链见 [`docs/v2-a1.5-latent-foundation.md`](v2-a1.5-latent-foundation.md) 与冷归档包内 `tmp/V2-A1.5 result.md`；归档位置映射见 `docs/DIRECTORY_REFERENCE.md`。
 
 这一轮的稳定结果是：P0 结构化正控制在 ordinary test final/state `1.0/1.0`，但 composition `0.2734/0`、length `1.0/0.2266`；P1 Qwen3.5-2B 4096-cache warm-up/joint surrogate 在 ordinary validation/test final/state `1.0/1.0`，composition final/state `0.3242/0.3290`；P2 K=8 learned workspace ordinary test `1.0/1.0`，composition `0.2773/0`，length `1.0/0.6484`。P2 的 same-answer composition shuffle accuracy `0.2773`、changed prediction rate `0.8125`，说明样本身份依赖仍在。用户要求的 Qwen3.5-0.8B no-cap visible baseline 已提供独立入口；test/composition/length zero-shot 各128条的 parse/final/state 分别为 `0.1797/0.0625/0.0234`、`0.4063/0.3828/0.3750`、`0.0625/0/0`，2-shot final/state 分别为 `0.1328/0.0156`、`0.1953/0`、`0.0938/0`。未终态 completion 用显式 wall-time safety timeout 记录，不用隐藏 `max_new_tokens`，因此其批量矩阵不能与 latent 结果混为质量结论。
 

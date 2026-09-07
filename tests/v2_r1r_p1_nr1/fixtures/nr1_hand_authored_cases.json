@@ -1,0 +1,309 @@
+{
+  "schema_version": "yggdrasil.v2-r1r.p1-nr1.hand-authored-fixtures.v1",
+  "provenance": {
+    "expected_values": "手工按逐项前缀累加与有向可达性独立核算",
+    "generated_by": null,
+    "measurement_or_generator_used": false
+  },
+  "numeric_cases": [
+    {
+      "case_id": "numeric-hand-01",
+      "split": "qualification",
+      "candidates": [
+        {"handle": "hn1a0001", "deltas": [4, -9, 3, 2]},
+        {"handle": "hn1b0001", "deltas": [-2, 5, -1, 4]},
+        {"handle": "hn1c0001", "deltas": [3, -8, 1, -5]}
+      ],
+      "prefixes": {
+        "hn1a0001": [4, -5, -2, 0],
+        "hn1b0001": [-2, 3, 2, 6],
+        "hn1c0001": [3, -5, -4, -9]
+      },
+      "totals": {"hn1a0001": 0, "hn1b0001": 6, "hn1c0001": -9},
+      "winner": "hn1c0001",
+      "winner_position": 2,
+      "unique_optimum": true
+    },
+    {
+      "case_id": "numeric-hand-02",
+      "split": "qualification",
+      "candidates": [
+        {"handle": "hn2a0001", "deltas": [7, -3, -8, 6]},
+        {"handle": "hn2b0001", "deltas": [-4, 9, -1, 3]}
+      ],
+      "prefixes": {
+        "hn2a0001": [7, 4, -4, 2],
+        "hn2b0001": [-4, 5, 4, 7]
+      },
+      "totals": {"hn2a0001": 2, "hn2b0001": 7},
+      "winner": "hn2a0001",
+      "winner_position": 0,
+      "unique_optimum": true
+    },
+    {
+      "case_id": "numeric-hand-03",
+      "split": "qualification",
+      "candidates": [
+        {"handle": "hn3a0001", "deltas": [5, -2, 4, -1, 3]},
+        {"handle": "hn3b0001", "deltas": [-6, 4, 2, 1, -3]},
+        {"handle": "hn3c0001", "deltas": [3, 3, -10, 4, 2]},
+        {"handle": "hn3d0001", "deltas": [8, -5, -7, 2, -1]}
+      ],
+      "prefixes": {
+        "hn3a0001": [5, 3, 7, 6, 9],
+        "hn3b0001": [-6, -2, 0, 1, -2],
+        "hn3c0001": [3, 6, -4, 0, 2],
+        "hn3d0001": [8, 3, -4, -2, -3]
+      },
+      "totals": {"hn3a0001": 9, "hn3b0001": -2, "hn3c0001": 2, "hn3d0001": -3},
+      "winner": "hn3d0001",
+      "winner_position": 3,
+      "unique_optimum": true
+    },
+    {
+      "case_id": "numeric-hand-04",
+      "split": "qualification",
+      "candidates": [
+        {"handle": "hn4a0001", "deltas": [-5, 12, -4, -2, 1]},
+        {"handle": "hn4b0001", "deltas": [6, -2, -7, 1, -3]},
+        {"handle": "hn4c0001", "deltas": [4, -1, 2, -3, 5]}
+      ],
+      "prefixes": {
+        "hn4a0001": [-5, 7, 3, 1, 2],
+        "hn4b0001": [6, 4, -3, -2, -5],
+        "hn4c0001": [4, 3, 5, 2, 7]
+      },
+      "totals": {"hn4a0001": 2, "hn4b0001": -5, "hn4c0001": 7},
+      "winner": "hn4b0001",
+      "winner_position": 1,
+      "unique_optimum": true
+    },
+    {
+      "case_id": "numeric-hand-05",
+      "split": "qualification",
+      "candidates": [
+        {"handle": "hn5a0001", "deltas": [10, -4, -3, 2, -8, 1]},
+        {"handle": "hn5b0001", "deltas": [-1, 2, 3, -4, 5, -1]},
+        {"handle": "hn5c0001", "deltas": [4, -7, 6, -2, 1, 3]},
+        {"handle": "hn5d0001", "deltas": [-3, 9, -2, -4, 1, 2]},
+        {"handle": "hn5e0001", "deltas": [2, -1, 4, -2, -3, 5]}
+      ],
+      "prefixes": {
+        "hn5a0001": [10, 6, 3, 5, -3, -2],
+        "hn5b0001": [-1, 1, 4, 0, 5, 4],
+        "hn5c0001": [4, -3, 3, 1, 2, 5],
+        "hn5d0001": [-3, 6, 4, 0, 1, 3],
+        "hn5e0001": [2, 1, 5, 3, 0, 5]
+      },
+      "totals": {"hn5a0001": -2, "hn5b0001": 4, "hn5c0001": 5, "hn5d0001": 3, "hn5e0001": 5},
+      "winner": "hn5a0001",
+      "winner_position": 0,
+      "unique_optimum": true
+    },
+    {
+      "case_id": "numeric-hand-06",
+      "split": "qualification",
+      "candidates": [
+        {"handle": "hn6a0001", "deltas": [3, -2, -1, 4, -3, 2]},
+        {"handle": "hn6b0001", "deltas": [5, -8, 4, -1, 2, -3]},
+        {"handle": "hn6c0001", "deltas": [-4, 6, -2, 3, -1, 2]},
+        {"handle": "hn6d0001", "deltas": [7, -1, -6, 2, -3, -2]}
+      ],
+      "prefixes": {
+        "hn6a0001": [3, 1, 0, 4, 1, 3],
+        "hn6b0001": [5, -3, 1, 0, 2, -1],
+        "hn6c0001": [-4, 2, 0, 3, 2, 4],
+        "hn6d0001": [7, 6, 0, 2, -1, -3]
+      },
+      "totals": {"hn6a0001": 3, "hn6b0001": -1, "hn6c0001": 4, "hn6d0001": -3},
+      "winner": "hn6d0001",
+      "winner_position": 3,
+      "unique_optimum": true
+    }
+  ],
+  "relation_cases": [
+    {
+      "case_id": "relation-hand-01",
+      "split": "qualification",
+      "features": ["branch", "merge"],
+      "handles": ["hbranch1", "hbranch2", "hbranch3", "hbranch4", "hbranch5"],
+      "edges": [["hbranch1", "hbranch2"], ["hbranch1", "hbranch3"], ["hbranch2", "hbranch4"], ["hbranch3", "hbranch4"], ["hbranch4", "hbranch5"]],
+      "closure": [["hbranch1", "hbranch2"], ["hbranch1", "hbranch3"], ["hbranch1", "hbranch4"], ["hbranch1", "hbranch5"], ["hbranch2", "hbranch4"], ["hbranch2", "hbranch5"], ["hbranch3", "hbranch4"], ["hbranch3", "hbranch5"], ["hbranch4", "hbranch5"]],
+      "queries": [
+        {"source": "hbranch1", "target": "hbranch5"},
+        {"source": "hbranch3", "target": "hbranch2"},
+        {"source": "hbranch2", "target": "hbranch5"},
+        {"source": "hbranch5", "target": "hbranch1"},
+        {"source": "hbranch1", "target": "hbranch4"}
+      ],
+      "decisions": [true, false, true, false, true]
+    },
+    {
+      "case_id": "relation-hand-02",
+      "split": "qualification",
+      "features": ["merge"],
+      "handles": ["hmerge1", "hmerge2", "hmerge3", "hmerge4", "hmerge5", "hmerge6"],
+      "edges": [["hmerge1", "hmerge3"], ["hmerge2", "hmerge3"], ["hmerge3", "hmerge4"], ["hmerge5", "hmerge4"], ["hmerge4", "hmerge6"]],
+      "closure": [["hmerge1", "hmerge3"], ["hmerge1", "hmerge4"], ["hmerge1", "hmerge6"], ["hmerge2", "hmerge3"], ["hmerge2", "hmerge4"], ["hmerge2", "hmerge6"], ["hmerge3", "hmerge4"], ["hmerge3", "hmerge6"], ["hmerge5", "hmerge4"], ["hmerge5", "hmerge6"], ["hmerge4", "hmerge6"]],
+      "queries": [
+        {"source": "hmerge1", "target": "hmerge6"},
+        {"source": "hmerge5", "target": "hmerge3"},
+        {"source": "hmerge2", "target": "hmerge4"},
+        {"source": "hmerge6", "target": "hmerge4"}
+      ],
+      "decisions": [true, false, true, false]
+    },
+    {
+      "case_id": "relation-hand-03",
+      "split": "qualification",
+      "features": ["multiple_components"],
+      "handles": ["hmulti1", "hmulti2", "hmulti3", "hmulti4", "hmulti5", "hmulti6", "hmulti7", "hmulti8"],
+      "edges": [["hmulti1", "hmulti2"], ["hmulti2", "hmulti3"], ["hmulti4", "hmulti5"], ["hmulti6", "hmulti7"], ["hmulti7", "hmulti8"]],
+      "closure": [["hmulti1", "hmulti2"], ["hmulti1", "hmulti3"], ["hmulti2", "hmulti3"], ["hmulti4", "hmulti5"], ["hmulti6", "hmulti7"], ["hmulti6", "hmulti8"], ["hmulti7", "hmulti8"]],
+      "queries": [
+        {"source": "hmulti1", "target": "hmulti3"},
+        {"source": "hmulti3", "target": "hmulti1"},
+        {"source": "hmulti4", "target": "hmulti5"},
+        {"source": "hmulti5", "target": "hmulti4"},
+        {"source": "hmulti6", "target": "hmulti8"},
+        {"source": "hmulti8", "target": "hmulti6"}
+      ],
+      "decisions": [true, false, true, false, true, false]
+    },
+    {
+      "case_id": "relation-hand-04",
+      "split": "qualification",
+      "features": ["multiple_paths", "transitive_redundancy"],
+      "handles": ["hpath1", "hpath2", "hpath3", "hpath4", "hpath5", "hpath6", "hpath7"],
+      "edges": [["hpath1", "hpath2"], ["hpath1", "hpath3"], ["hpath2", "hpath4"], ["hpath3", "hpath4"], ["hpath2", "hpath5"], ["hpath5", "hpath6"], ["hpath4", "hpath6"], ["hpath1", "hpath4"], ["hpath1", "hpath6"], ["hpath6", "hpath7"]],
+      "closure": [["hpath1", "hpath2"], ["hpath1", "hpath3"], ["hpath1", "hpath4"], ["hpath1", "hpath5"], ["hpath1", "hpath6"], ["hpath1", "hpath7"], ["hpath2", "hpath4"], ["hpath2", "hpath5"], ["hpath2", "hpath6"], ["hpath2", "hpath7"], ["hpath3", "hpath4"], ["hpath3", "hpath6"], ["hpath3", "hpath7"], ["hpath4", "hpath6"], ["hpath4", "hpath7"], ["hpath5", "hpath6"], ["hpath5", "hpath7"], ["hpath6", "hpath7"]],
+      "queries": [
+        {"source": "hpath1", "target": "hpath7"},
+        {"source": "hpath3", "target": "hpath5"},
+        {"source": "hpath2", "target": "hpath6"},
+        {"source": "hpath5", "target": "hpath4"},
+        {"source": "hpath4", "target": "hpath7"},
+        {"source": "hpath7", "target": "hpath1"},
+        {"source": "hpath1", "target": "hpath4"}
+      ],
+      "decisions": [true, false, true, false, true, false, true]
+    },
+    {
+      "case_id": "relation-hand-05",
+      "split": "qualification",
+      "features": ["irrelevant_edge", "disconnected_component"],
+      "handles": ["hirrel1", "hirrel2", "hirrel3", "hirrel4", "hirrel5", "hirrel6", "hirrel7"],
+      "edges": [["hirrel1", "hirrel2"], ["hirrel2", "hirrel3"], ["hirrel3", "hirrel4"], ["hirrel5", "hirrel6"]],
+      "closure": [["hirrel1", "hirrel2"], ["hirrel1", "hirrel3"], ["hirrel1", "hirrel4"], ["hirrel2", "hirrel3"], ["hirrel2", "hirrel4"], ["hirrel3", "hirrel4"], ["hirrel5", "hirrel6"]],
+      "queries": [
+        {"source": "hirrel1", "target": "hirrel4"},
+        {"source": "hirrel4", "target": "hirrel1"},
+        {"source": "hirrel5", "target": "hirrel6"},
+        {"source": "hirrel6", "target": "hirrel5"},
+        {"source": "hirrel1", "target": "hirrel6"},
+        {"source": "hirrel7", "target": "hirrel1"}
+      ],
+      "decisions": [true, false, true, false, false, false]
+    },
+    {
+      "case_id": "relation-hand-06",
+      "split": "qualification",
+      "features": ["branch", "merge", "multiple_paths", "irrelevant_edge", "transitive_redundancy"],
+      "handles": ["hcombo1", "hcombo2", "hcombo3", "hcombo4", "hcombo5", "hcombo6", "hcombo7", "hcombo8"],
+      "edges": [["hcombo1", "hcombo2"], ["hcombo1", "hcombo3"], ["hcombo2", "hcombo4"], ["hcombo3", "hcombo4"], ["hcombo4", "hcombo5"], ["hcombo2", "hcombo5"], ["hcombo6", "hcombo7"], ["hcombo7", "hcombo8"]],
+      "closure": [["hcombo1", "hcombo2"], ["hcombo1", "hcombo3"], ["hcombo1", "hcombo4"], ["hcombo1", "hcombo5"], ["hcombo2", "hcombo4"], ["hcombo2", "hcombo5"], ["hcombo3", "hcombo4"], ["hcombo3", "hcombo5"], ["hcombo4", "hcombo5"], ["hcombo6", "hcombo7"], ["hcombo6", "hcombo8"], ["hcombo7", "hcombo8"]],
+      "queries": [
+        {"source": "hcombo2", "target": "hcombo5"},
+        {"source": "hcombo8", "target": "hcombo6"},
+        {"source": "hcombo1", "target": "hcombo4"},
+        {"source": "hcombo5", "target": "hcombo1"},
+        {"source": "hcombo6", "target": "hcombo8"},
+        {"source": "hcombo3", "target": "hcombo5"},
+        {"source": "hcombo1", "target": "hcombo8"},
+        {"source": "hcombo7", "target": "hcombo8"}
+      ],
+      "decisions": [true, false, true, false, true, true, false, true]
+    }
+  ],
+  "fault_targets": {
+    "numeric_sign_flip": {
+      "domain": "numeric",
+      "case_id": "numeric-hand-01",
+      "target": {"candidate_handle": "hn1a0001", "delta_index": 0},
+      "expected_effect": "固定翻转 hn1a0001 的第 0 个 delta"
+    },
+    "numeric_drop_last": {
+      "domain": "numeric",
+      "case_id": "numeric-hand-03",
+      "target": {"candidate_handle": "hn3d0001", "delta_index": 4, "winner": true},
+      "expected_effect": "固定删除 winner hn3d0001 的最后一个 delta"
+    },
+    "numeric_final_off_by_one": {
+      "domain": "numeric",
+      "case_id": "numeric-hand-02",
+      "target": {"candidate_handle": "hn2a0001", "delta_index": 3},
+      "expected_effect": "固定扰动 hn2a0001 的最终位置"
+    },
+    "numeric_constant_collapse": {
+      "domain": "numeric",
+      "case_id": "numeric-hand-04",
+      "target": {"candidate_handles": ["hn4a0001", "hn4b0001", "hn4c0001"], "constant": 0},
+      "expected_effect": "固定将该 case 的所有输出压到同一常数"
+    },
+    "numeric_winner_swap": {
+      "domain": "numeric",
+      "case_id": "numeric-hand-03",
+      "target": {"winner_handle": "hn3d0001", "runner_up_handle": "hn3b0001", "winner_total": -3, "runner_up_total": -2},
+      "expected_effect": "固定交换已知 winner 与 runner-up 的决策位置"
+    },
+    "numeric_position_shortcut": {
+      "domain": "numeric",
+      "case_id": "numeric-hand-04",
+      "target": {"candidate_order": ["hn4a0001", "hn4b0001", "hn4c0001"], "expected_winner_position": 1},
+      "expected_effect": "固定以候选位置 1 作为目标，不能从被测 state 推导"
+    },
+    "relation_drop_bridge": {
+      "domain": "relation",
+      "case_id": "relation-hand-01",
+      "target": {"edge": ["hbranch4", "hbranch5"], "affected_query": {"source": "hbranch1", "target": "hbranch5"}},
+      "expected_effect": "固定删除 bridge edge，破坏从 branch 到 merge 后端的路径"
+    },
+    "relation_reverse_pollution": {
+      "domain": "relation",
+      "case_id": "relation-hand-02",
+      "target": {"edge": ["hmerge1", "hmerge3"], "reverse_edge": ["hmerge3", "hmerge1"]},
+      "expected_effect": "固定把指定边反向注入，不依赖 closure"
+    },
+    "relation_spurious": {
+      "domain": "relation",
+      "case_id": "relation-hand-05",
+      "target": {"spurious_query": {"source": "hirrel1", "target": "hirrel6"}},
+      "expected_effect": "固定选择跨组件且真值为 false 的 query"
+    },
+    "relation_handle_alias": {
+      "domain": "relation",
+      "case_id": "relation-hand-03",
+      "target": {"source_handle": "hmulti1", "alias_to_handle": "hunknownfixture1", "schema_rejection": true},
+      "expected_effect": "固定注入不属于 state handle registry 的 opaque alias，schema 必须 fail closed"
+    },
+    "relation_query_shortcut": {
+      "domain": "relation",
+      "case_id": "relation-hand-04",
+      "target": {
+        "query_indices": [0, 1, 2, 3, 4, 5, 6],
+        "expected_decisions": [true, false, true, false, true, false, true],
+        "shortcut_decisions": [false, true, false, true, false, true, false],
+        "query_order": [
+          {"source": "hpath1", "target": "hpath7"},
+          {"source": "hpath3", "target": "hpath5"},
+          {"source": "hpath2", "target": "hpath6"},
+          {"source": "hpath5", "target": "hpath4"},
+          {"source": "hpath4", "target": "hpath7"},
+          {"source": "hpath7", "target": "hpath1"},
+          {"source": "hpath1", "target": "hpath4"}
+        ]
+      },
+      "expected_effect": "固定按 query 顺序提供 decision，不能从被测 state 读取真值"
+    }
+  }
+}
